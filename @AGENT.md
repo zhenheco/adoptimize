@@ -1,158 +1,284 @@
-# Agent Build Instructions
+# AdOptimize - Agent Build Instructions
 
-## Project Setup
+## Project Overview
+
+AdOptimize 是一個跨平台廣告優化工具，採用**混合架構**：
+- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
+- **Backend**: FastAPI + Python (Google/Meta API Integration)
+- **Database**: PostgreSQL + Redis
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Docker & Docker Compose
+- pnpm (recommended)
+
+### 1. Start Infrastructure
 ```bash
-# Install dependencies (example for Node.js project)
-npm install
+# Start PostgreSQL and Redis
+docker-compose -f docker/docker-compose.yml up -d
+```
 
-# Or for Python project
+### 2. Frontend Setup
+```bash
+# Install dependencies
+pnpm install
+
+# Run development server
+pnpm dev
+
+# Visit http://localhost:3000
+```
+
+### 3. Backend Setup
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Or for Rust project  
-cargo build
+# Run database migrations
+alembic upgrade head
+
+# Start FastAPI server
+uvicorn app.main:app --reload --port 8000
+
+# Start Celery worker (separate terminal)
+celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-## Running Tests
+---
+
+## Development Commands
+
+### Frontend (Next.js)
 ```bash
-# Node.js
-npm test
-
-# Python
-pytest
-
-# Rust
-cargo test
+pnpm dev              # Start development server (port 3000)
+pnpm build            # Production build
+pnpm start            # Start production server
+pnpm lint             # Run ESLint
+pnpm test             # Run Vitest tests
+pnpm test:coverage    # Coverage report
 ```
 
-## Build Commands
+### Backend (Python)
 ```bash
-# Production build
-npm run build
-# or
-cargo build --release
+cd backend
+
+# Development
+uvicorn app.main:app --reload --port 8000
+
+# Testing
+pytest                            # Run all tests
+pytest --cov=app tests/           # Coverage report
+pytest tests/test_specific.py     # Run specific test
+
+# Database
+alembic upgrade head              # Run migrations
+alembic revision --autogenerate -m "description"  # Create migration
+
+# Celery
+celery -A app.workers.celery_app worker --loglevel=info
+celery -A app.workers.celery_app beat --loglevel=info  # Scheduler
 ```
 
-## Development Server
+### Docker
 ```bash
-# Start development server
-npm run dev
-# or
-cargo run
+# Start all services
+docker-compose -f docker/docker-compose.yml up -d
+
+# Stop all services
+docker-compose -f docker/docker-compose.yml down
+
+# View logs
+docker-compose -f docker/docker-compose.yml logs -f
 ```
+
+---
+
+## Environment Variables
+
+### Frontend (.env.local)
+```bash
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-32-char-secret-here
+
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Backend (.env)
+```bash
+# Database
+DATABASE_URL=postgresql://adoptimize:password@localhost:5432/adoptimize
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Google Ads API
+GOOGLE_ADS_CLIENT_ID=your-client-id
+GOOGLE_ADS_CLIENT_SECRET=your-client-secret
+GOOGLE_ADS_DEVELOPER_TOKEN=your-developer-token
+GOOGLE_ADS_REFRESH_TOKEN=your-refresh-token
+
+# Meta Marketing API
+META_APP_ID=your-app-id
+META_APP_SECRET=your-app-secret
+META_ACCESS_TOKEN=your-access-token
+```
+
+---
+
+## Project Structure
+
+```
+adoptimize/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Auth pages
+│   ├── (dashboard)/       # Dashboard pages
+│   └── api/v1/            # BFF API Routes
+├── components/            # React components
+│   ├── ui/               # shadcn/ui
+│   ├── dashboard/        # Dashboard components
+│   └── shared/           # Shared components
+├── lib/                   # Utilities
+├── backend/              # Python services
+│   ├── app/
+│   │   ├── routers/      # API endpoints
+│   │   ├── services/     # Business logic
+│   │   ├── models/       # SQLAlchemy models
+│   │   └── workers/      # Celery tasks
+│   └── tests/
+├── docker/               # Docker configs
+├── specs/                # Specifications
+├── @fix_plan.md          # Task tracking
+├── @AGENT.md             # This file
+└── PROMPT.md             # Development instructions
+```
+
+---
+
+## Testing Strategy
+
+### Frontend Testing
+- **Framework**: Vitest + React Testing Library
+- **Coverage Target**: 80%
+- **Focus**: Components, hooks, API handlers
+
+### Backend Testing
+- **Framework**: Pytest + pytest-asyncio
+- **Coverage Target**: 85%
+- **Focus**: Services, API endpoints, workers
+
+---
+
+## Quality Standards
+
+### Before Marking Feature Complete
+- [ ] All tests passing
+- [ ] Coverage meets threshold (80% frontend, 85% backend)
+- [ ] No TypeScript/linting errors
+- [ ] Changes committed with conventional commits
+- [ ] @fix_plan.md updated
+
+### Conventional Commit Format
+```
+feat(dashboard): add metric cards with status indicators
+fix(auth): resolve token refresh race condition
+test(health): add audit score calculation tests
+docs(api): update endpoint documentation
+```
+
+---
+
+## API Communication Pattern
+
+### BFF (Backend for Frontend)
+```
+Browser → Next.js API Route → FastAPI Backend → Google/Meta APIs
+```
+
+### Example BFF Route
+```typescript
+// app/api/v1/dashboard/overview/route.ts
+export async function GET(request: Request) {
+  const session = await getServerSession();
+  if (!session) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const res = await fetch(`${process.env.PYTHON_API_URL}/api/v1/dashboard/overview`, {
+    headers: { 'Authorization': `Bearer ${session.accessToken}` }
+  });
+
+  return Response.json(await res.json());
+}
+```
+
+---
 
 ## Key Learnings
-- Update this section when you learn new build optimizations
-- Document any gotchas or special setup requirements
-- Keep track of the fastest test/build cycle
 
-## Feature Development Quality Standards
+### Architecture Decisions
+1. **Hybrid Architecture**: Best of both worlds - Next.js for UI, Python for API SDK compatibility
+2. **BFF Pattern**: Next.js API routes proxy to Python, simplifying auth and CORS
+3. **Celery for Background Jobs**: Google/Meta API rate limits require careful scheduling
 
-**CRITICAL**: All new features MUST meet the following mandatory requirements before being considered complete.
+### Performance Considerations
+1. Use Redis for caching frequently accessed metrics
+2. Implement incremental sync (only fetch changed data)
+3. Use database connection pooling
 
-### Testing Requirements
+### Security Notes
+1. Never expose Google/Meta API credentials to frontend
+2. All sensitive data flows through BFF
+3. Implement proper token refresh before expiry
 
-- **Minimum Coverage**: 85% code coverage ratio required for all new code
-- **Test Pass Rate**: 100% - all tests must pass, no exceptions
-- **Test Types Required**:
-  - Unit tests for all business logic and services
-  - Integration tests for API endpoints or main functionality
-  - End-to-end tests for critical user workflows
-- **Coverage Validation**: Run coverage reports before marking features complete:
-  ```bash
-  # Examples by language/framework
-  npm run test:coverage
-  pytest --cov=src tests/ --cov-report=term-missing
-  cargo tarpaulin --out Html
-  ```
-- **Test Quality**: Tests must validate behavior, not just achieve coverage metrics
-- **Test Documentation**: Complex test scenarios must include comments explaining the test strategy
+---
 
-### Git Workflow Requirements
+## Troubleshooting
 
-Before moving to the next feature, ALL changes must be:
+### Common Issues
 
-1. **Committed with Clear Messages**:
-   ```bash
-   git add .
-   git commit -m "feat(module): descriptive message following conventional commits"
-   ```
-   - Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, etc.
-   - Include scope when applicable: `feat(api):`, `fix(ui):`, `test(auth):`
-   - Write descriptive messages that explain WHAT changed and WHY
+**Port already in use**
+```bash
+# Kill process on port 3000
+lsof -ti:3000 | xargs kill -9
 
-2. **Pushed to Remote Repository**:
-   ```bash
-   git push origin <branch-name>
-   ```
-   - Never leave completed features uncommitted
-   - Push regularly to maintain backup and enable collaboration
-   - Ensure CI/CD pipelines pass before considering feature complete
+# Kill process on port 8000
+lsof -ti:8000 | xargs kill -9
+```
 
-3. **Branch Hygiene**:
-   - Work on feature branches, never directly on `main`
-   - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
-   - Create pull requests for all significant changes
+**Database connection failed**
+```bash
+# Check if PostgreSQL is running
+docker-compose -f docker/docker-compose.yml ps
 
-4. **Ralph Integration**:
-   - Update @fix_plan.md with new tasks before starting work
-   - Mark items complete in @fix_plan.md upon completion
-   - Update PROMPT.md if development patterns change
-   - Test features work within Ralph's autonomous loop
+# Restart services
+docker-compose -f docker/docker-compose.yml restart
+```
 
-### Documentation Requirements
+**Redis connection failed**
+```bash
+# Check Redis status
+docker-compose -f docker/docker-compose.yml logs redis
+```
 
-**ALL implementation documentation MUST remain synchronized with the codebase**:
+---
 
-1. **Code Documentation**:
-   - Language-appropriate documentation (JSDoc, docstrings, etc.)
-   - Update inline comments when implementation changes
-   - Remove outdated comments immediately
+## Reference Links
 
-2. **Implementation Documentation**:
-   - Update relevant sections in this AGENT.md file
-   - Keep build and test commands current
-   - Update configuration examples when defaults change
-   - Document breaking changes prominently
+- [Next.js 14 Docs](https://nextjs.org/docs)
+- [FastAPI Docs](https://fastapi.tiangolo.com)
+- [Google Ads API](https://developers.google.com/google-ads/api/docs/start)
+- [Meta Marketing API](https://developers.facebook.com/docs/marketing-apis)
+- [shadcn/ui](https://ui.shadcn.com)
+- [Recharts](https://recharts.org)
 
-3. **README Updates**:
-   - Keep feature lists current
-   - Update setup instructions when dependencies change
-   - Maintain accurate command examples
-   - Update version compatibility information
-
-4. **AGENT.md Maintenance**:
-   - Add new build patterns to relevant sections
-   - Update "Key Learnings" with new insights
-   - Keep command examples accurate and tested
-   - Document new testing patterns or quality gates
-
-### Feature Completion Checklist
-
-Before marking ANY feature as complete, verify:
-
-- [ ] All tests pass with appropriate framework command
-- [ ] Code coverage meets 85% minimum threshold
-- [ ] Coverage report reviewed for meaningful test quality
-- [ ] Code formatted according to project standards
-- [ ] Type checking passes (if applicable)
-- [ ] All changes committed with conventional commit messages
-- [ ] All commits pushed to remote repository
-- [ ] @fix_plan.md task marked as complete
-- [ ] Implementation documentation updated
-- [ ] Inline code comments updated or added
-- [ ] AGENT.md updated (if new patterns introduced)
-- [ ] Breaking changes documented
-- [ ] Features tested within Ralph loop (if applicable)
-- [ ] CI/CD pipeline passes
-
-### Rationale
-
-These standards ensure:
-- **Quality**: High test coverage and pass rates prevent regressions
-- **Traceability**: Git commits and @fix_plan.md provide clear history of changes
-- **Maintainability**: Current documentation reduces onboarding time and prevents knowledge loss
-- **Collaboration**: Pushed changes enable team visibility and code review
-- **Reliability**: Consistent quality gates maintain production stability
-- **Automation**: Ralph integration ensures continuous development practices
-
-**Enforcement**: AI agents should automatically apply these standards to all feature development tasks without requiring explicit instruction for each task.
