@@ -5,8 +5,9 @@
 """
 
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,8 +41,17 @@ class Settings(BaseSettings):
     META_APP_SECRET: Optional[str] = None
     META_ACCESS_TOKEN: Optional[str] = None
 
-    # CORS 設定
+    # CORS 設定 (支援逗號分隔字串或 list)
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
+        """解析 CORS_ORIGINS，支援逗號分隔字串格式"""
+        if isinstance(v, str):
+            # 移除空白並以逗號分隔
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",
