@@ -61,6 +61,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
           command: deploy
 
       # Preview 部署 (feature branches)
@@ -70,4 +71,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
           command: deploy --env preview
