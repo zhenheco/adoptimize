@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // OpenNext.js 必要設定
+  output: 'standalone',
+
   // 設定 Python 後端 API URL (使用 NEXT_PUBLIC_ 前綴以便 build-time 嵌入)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
