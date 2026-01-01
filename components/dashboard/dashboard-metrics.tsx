@@ -72,24 +72,28 @@ export function DashboardMetrics({ period = '7d' }: DashboardMetricsProps) {
         value={`$${metrics.spend.value.toLocaleString()}`}
         change={metrics.spend.change}
         status={metrics.spend.status}
+        termId="spend"
       />
       <MetricCard
         title="曝光次數"
         value={metrics.impressions.value.toLocaleString()}
         change={metrics.impressions.change}
         status={metrics.impressions.status}
+        termId="impressions"
       />
       <MetricCard
         title="點擊數"
         value={metrics.clicks.value.toLocaleString()}
         change={metrics.clicks.change}
         status={metrics.clicks.status}
+        termId="clicks"
       />
       <MetricCard
         title="轉換數"
         value={metrics.conversions.value.toLocaleString()}
         change={metrics.conversions.change}
         status={metrics.conversions.status}
+        termId="conversions"
       />
       <MetricCard
         title="CPA"
@@ -97,12 +101,14 @@ export function DashboardMetrics({ period = '7d' }: DashboardMetricsProps) {
         change={metrics.cpa.change}
         status={metrics.cpa.status}
         invertChange
+        termId="cpa"
       />
       <MetricCard
         title="ROAS"
         value={`${metrics.roas.value.toFixed(1)}x`}
         change={metrics.roas.change}
         status={metrics.roas.status}
+        termId="roas"
       />
     </div>
   );

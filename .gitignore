@@ -80,3 +80,4 @@ google-ads.yaml
 # 測試報告
 coverage/
 test-results/
+.vercel

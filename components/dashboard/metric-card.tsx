@@ -1,5 +1,6 @@
 import { cn, formatChange, getStatusIcon } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TermTooltip } from '@/components/ui/term-tooltip';
 
 /**
  * 指標狀態類型
@@ -20,6 +21,8 @@ export interface MetricCardProps {
   status: MetricStatus;
   /** 是否反轉變化顏色（例如 CPA 下降是好事） */
   invertChange?: boolean;
+  /** 術語 ID，用於顯示解釋 Tooltip */
+  termId?: string;
 }
 
 /**
@@ -40,6 +43,7 @@ export function MetricCard({
   change,
   status,
   invertChange = false,
+  termId,
 }: MetricCardProps) {
   // 判斷變化方向是否為正向
   const isPositiveChange = invertChange ? change < 0 : change > 0;
@@ -63,8 +67,9 @@ export function MetricCard({
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
       {/* 標題與狀態 */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
           {title}
+          {termId && <TermTooltip termId={termId} />}
         </span>
         <span className="text-sm" title={`狀態: ${status}`}>
           {getStatusIcon(status)}

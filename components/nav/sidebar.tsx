@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react';
+import { RestartTourButton } from '@/components/onboarding';
 
 /**
  * 導航項目介面
@@ -90,6 +91,7 @@ export function Sidebar() {
 
       {/* 底部操作區域 */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+        <RestartTourButton />
         <Link
           href="/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
