@@ -11,6 +11,11 @@
     "binding": "ASSETS"
   },
 
+  // 自訂網域
+  "routes": [
+    { "pattern": "adoptimize.1wayseo.com", "custom_domain": true }
+  ],
+
   // 環境變數 (Runtime)
   "vars": {
     "PYTHON_API_URL": "https://adoptimize-api.zeabur.app"
