@@ -15,9 +15,16 @@ const config: OpenNextConfig = {
   // 處理 Node.js crypto 模組
   edgeExternals: ["node:crypto"],
 
-  // 不使用外部 middleware（專案沒有自訂 middleware）
   middleware: {
-    external: false,
+    external: true,
+    override: {
+      wrapper: "cloudflare-edge",
+      converter: "edge",
+      proxyExternalRequest: "fetch",
+      incrementalCache: "dummy",
+      tagCache: "dummy",
+      queue: "dummy",
+    },
   },
 };
 
