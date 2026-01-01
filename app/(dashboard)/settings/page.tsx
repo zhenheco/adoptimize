@@ -19,7 +19,6 @@ import {
   Link2,
   Bell,
   RefreshCw,
-  Palette,
   Download,
   HelpCircle,
   ExternalLink,
@@ -110,9 +109,10 @@ const mockAccounts = [
  * 1. 帳戶連結 - 已連結的廣告帳戶管理
  * 2. 通知設定 - 各類通知開關
  * 3. 同步頻率 - 資料同步間隔設定
- * 4. 主題設定 - 深色/淺色模式
- * 5. 資料匯出 - CSV/PDF 匯出選項
- * 6. 導覽設定 - 重新觀看導覽
+ * 4. 資料匯出 - CSV/PDF 匯出選項
+ * 5. 導覽設定 - 重新觀看導覽
+ *
+ * 註：主題切換功能已移至側邊欄 Logo 旁
  */
 export default function SettingsPage() {
   // 通知設定狀態
@@ -125,9 +125,6 @@ export default function SettingsPage() {
 
   // 同步頻率狀態
   const [syncFrequency, setSyncFrequency] = useState('15');
-
-  // 主題設定狀態
-  const [darkMode, setDarkMode] = useState(false);
 
   /**
    * 格式化最後同步時間
@@ -276,21 +273,7 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
-      {/* 4. 主題設定區塊 */}
-      <SettingsSection
-        icon={<Palette className="w-5 h-5" />}
-        title="主題設定"
-        description="自訂介面外觀"
-      >
-        <SettingItem
-          label="深色模式"
-          description="使用深色背景以減少眼睛疲勞"
-          checked={darkMode}
-          onCheckedChange={setDarkMode}
-        />
-      </SettingsSection>
-
-      {/* 5. 資料匯出區塊 */}
+      {/* 4. 資料匯出區塊 */}
       <SettingsSection
         icon={<Download className="w-5 h-5" />}
         title="資料匯出"
@@ -311,7 +294,7 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
-      {/* 6. 導覽設定區塊 */}
+      {/* 5. 導覽設定區塊 */}
       <SettingsSection
         icon={<HelpCircle className="w-5 h-5" />}
         title="導覽設定"

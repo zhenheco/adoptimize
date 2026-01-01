@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -11,8 +12,11 @@ import {
   Zap,
   Settings,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { RestartTourButton } from '@/components/onboarding';
+import { Button } from '@/components/ui/button';
 
 /**
  * 導航項目介面
@@ -40,6 +44,7 @@ const navItems: NavItem[] = [
  */
 export function Sidebar() {
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
 
   /**
    * 判斷導航項目是否為當前頁面
@@ -51,18 +56,38 @@ export function Sidebar() {
     return pathname.startsWith(href);
   };
 
+  /**
+   * 切換深淺色主題
+   */
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo 區域 */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">AO</span>
-          </div>
-          <span className="text-xl font-bold text-gray-900 dark:text-white">
-            AdOptimize
-          </span>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">AO</span>
+            </div>
+            <span className="text-xl font-bold text-gray-900 dark:text-white">
+              AdOptimize
+            </span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-8 w-8"
+            title={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">切換主題</span>
+          </Button>
+        </div>
       </div>
 
       {/* 導航項目 */}
