@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "adoptimize",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Assets 設定 (static files)
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // 環境變數 (Runtime)
+  "vars": {
+    "PYTHON_API_URL": "https://adoptimize-api.zeabur.app"
+  },
+
+  // 預覽環境
+  "env": {
+    "preview": {
+      "name": "adoptimize-preview",
+      "vars": {
+        "PYTHON_API_URL": "https://adoptimize-api.zeabur.app"
+      }
+    }
+  }
+}

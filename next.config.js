@@ -2,18 +2,20 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // 設定 Python 後端 API URL
+  // 設定 Python 後端 API URL (使用 NEXT_PUBLIC_ 前綴以便 build-time 嵌入)
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     return [
       {
         source: '/api/python/:path*',
-        destination: `${process.env.PYTHON_API_URL || 'http://localhost:8000'}/api/:path*`,
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },
 
-  // 圖片優化設定
+  // 圖片優化設定 (Cloudflare Workers 需要使用 unoptimized)
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
