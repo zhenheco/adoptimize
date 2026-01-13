@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logo SVG to PNG Converter</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    .preview {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin: 20px 0;
+    }
+    canvas {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .info {
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>AdOptimize Logo Converter</h1>
+
+  <div class="preview">
+    <canvas id="canvas" width="1024" height="1024"></canvas>
+  </div>
+
+  <div>
+    <button onclick="downloadPNG()">Download 1024x1024 PNG</button>
+    <button onclick="downloadFavicon()">Download favicon.ico (32x32)</button>
+  </div>
+
+  <p class="info">Click the buttons above to download the logo in different formats.</p>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Load and draw the SVG
+    const img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0, 1024, 1024);
+      console.log('Logo rendered successfully');
+    };
+    img.onerror = function(e) {
+      console.error('Failed to load SVG:', e);
+      // Draw fallback text
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(0, 0, 1024, 1024);
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 120px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('AdOptimize', 512, 550);
+    };
+    img.src = '/logo.svg';
+
+    function downloadPNG() {
+      const link = document.createElement('a');
+      link.download = 'icon-1024.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadFavicon() {
+      // Create a smaller canvas for favicon
+      const smallCanvas = document.createElement('canvas');
+      smallCanvas.width = 32;
+      smallCanvas.height = 32;
+      const smallCtx = smallCanvas.getContext('2d');
+      smallCtx.drawImage(canvas, 0, 0, 32, 32);
+
+      const link = document.createElement('a');
+      link.download = 'favicon.png';
+      link.href = smallCanvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
