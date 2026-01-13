@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
 import { TimeFilter } from '@/components/dashboard/time-filter';
 import { TrendChartWrapper } from '@/components/dashboard/trend-chart-wrapper';
+import { PeriodComparisonWrapper } from '@/components/dashboard/period-comparison-wrapper';
 import type { TimePeriod } from '@/lib/api/types';
 
 /**
@@ -35,6 +36,9 @@ export default function DashboardPage() {
 
       {/* 核心指標卡片（從 API 獲取數據） */}
       <DashboardMetrics period={period} />
+
+      {/* D-006: 期間比較表格 */}
+      <PeriodComparisonWrapper period={period} />
 
       {/* 趨勢圖表區域 */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">

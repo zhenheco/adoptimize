@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # 資料庫設定
+    # Supabase 格式: postgresql+asyncpg://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
     DATABASE_URL: str = "postgresql+asyncpg://adoptimize:password@localhost:5432/adoptimize"
+    SUPABASE_URL: Optional[str] = None  # Supabase 專案 URL
+    SUPABASE_ANON_KEY: Optional[str] = None  # Supabase 匿名 key
 
     # Redis 設定
     REDIS_URL: str = "redis://localhost:6379"
@@ -42,6 +45,21 @@ class Settings(BaseSettings):
 
     # CORS 設定 (存為字串，支援逗號分隔格式)
     CORS_ORIGINS: str = "http://localhost:3000"
+
+    # JWT 設定
+    JWT_SECRET_KEY: str = "your-super-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # AI API 設定（智慧建議引擎）
+    AI_PROVIDER: str = "anthropic"  # 'anthropic' 或 'openai'
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-4o"
+    AI_MAX_TOKENS: int = 4096
+    AI_TEMPERATURE: float = 0.7
 
     @property
     def cors_origins(self) -> list[str]:

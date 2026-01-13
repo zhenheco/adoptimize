@@ -71,3 +71,35 @@ export function getStatusIcon(status: 'normal' | 'warning' | 'danger'): string {
       return '⚪';
   }
 }
+
+/**
+ * 異常狀態類型
+ */
+export type AnomalyStatus = 'normal' | 'warning' | 'danger';
+
+/**
+ * 根據變化百分比判斷異常狀態
+ *
+ * 異常判定規則（來自 specs/requirements.md）:
+ * - change < -20%: danger (紅色警示) - 嚴重下降需立即關注
+ * - -20% <= change < -10%: warning (黃色警示) - 中度下降需關注
+ * - change >= -10%: normal (綠色正常) - 正常範圍或正向變化
+ *
+ * @param change - 變化百分比（如 -25 代表下降 25%）
+ * @returns 異常狀態
+ *
+ * @example
+ * getAnomalyStatus(-25) // => 'danger'
+ * getAnomalyStatus(-15) // => 'warning'
+ * getAnomalyStatus(-5)  // => 'normal'
+ * getAnomalyStatus(10)  // => 'normal'
+ */
+export function getAnomalyStatus(change: number): AnomalyStatus {
+  if (change < -20) {
+    return 'danger';
+  }
+  if (change < -10) {
+    return 'warning';
+  }
+  return 'normal';
+}

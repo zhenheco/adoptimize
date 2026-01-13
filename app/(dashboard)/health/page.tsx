@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useHealthAudit } from '@/hooks/use-health-audit';
-import { ScoreRing, DimensionCard, IssueCard } from '@/components/health';
+import { ScoreRing, DimensionCard, IssueCard, RepairWizard } from '@/components/health';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Filter } from 'lucide-react';
+import type { AuditIssue } from '@/lib/api/types';
 
 /**
  * 骨架屏元件
@@ -98,6 +99,25 @@ export default function HealthPage() {
   const { audit, issues, isLoading, error, triggerAudit, resolveIssue, ignoreIssue } =
     useHealthAudit();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [repairIssue, setRepairIssue] = useState<AuditIssue | null>(null);
+
+  // 開啟修復指南
+  const handleOpenRepairGuide = useCallback((issue: AuditIssue) => {
+    setRepairIssue(issue);
+  }, []);
+
+  // 關閉修復指南
+  const handleCloseRepairGuide = useCallback(() => {
+    setRepairIssue(null);
+  }, []);
+
+  // 完成修復並重新健檢
+  const handleCompleteRepair = useCallback((issueId: string) => {
+    resolveIssue(issueId);
+    setRepairIssue(null);
+    // 觸發重新健檢
+    triggerAudit();
+  }, [resolveIssue, triggerAudit]);
 
   // 過濾問題
   const filteredIssues = issues.filter((issue) => {
@@ -305,11 +325,23 @@ export default function HealthPage() {
                 issue={issue}
                 onResolve={resolveIssue}
                 onIgnore={ignoreIssue}
+                onOpenRepairGuide={handleOpenRepairGuide}
               />
             ))
           )}
         </div>
       </div>
+
+      {/* 修復指南 Modal */}
+      {repairIssue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <RepairWizard
+            issue={repairIssue}
+            onComplete={handleCompleteRepair}
+            onClose={handleCloseRepairGuide}
+          />
+        </div>
+      )}
     </div>
   );
 }

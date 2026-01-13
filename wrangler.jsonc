@@ -11,10 +11,10 @@
     "binding": "ASSETS"
   },
 
-  // 自訂網域
-  "routes": [
-    { "pattern": "adoptimize.1wayseo.com", "custom_domain": true }
-  ],
+  // 自訂網域 - 暫時移除以避免 DNS 衝突
+  // "routes": [
+  //   { "pattern": "adoptimize.1wayseo.com", "custom_domain": true }
+  // ],
 
   // 環境變數 (Runtime)
   "vars": {

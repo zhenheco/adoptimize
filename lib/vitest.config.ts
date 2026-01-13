@@ -1,7 +1,8 @@
 /**
  * Vitest Configuration for AdOptimize
  *
- * Uses manual alias resolution matching tsconfig.json paths
+ * Uses path.resolve for proper TypeScript path alias resolution
+ * (vite-tsconfig-paths is ESM-only and causes esbuild issues)
  */
 
 import { defineConfig } from 'vitest/config';
@@ -16,6 +17,10 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@/lib': path.resolve(rootDir, 'lib'),
+      '@/components': path.resolve(rootDir, 'components'),
+      '@/hooks': path.resolve(rootDir, 'hooks'),
+      '@/app': path.resolve(rootDir, 'app'),
       '@': rootDir,
     },
   },
@@ -56,6 +61,6 @@ export default defineConfig({
         '*.config.*',
       ],
     },
-    setupFiles: [],
+    setupFiles: [path.join(__dirname, 'vitest.setup.ts')],
   },
 });

@@ -223,4 +223,101 @@ describe('MetricCard', () => {
       expect(statusIcon).toBeDefined();
     });
   });
+
+  /**
+   * D-005: Anomaly markers 測試
+   * 根據 change 百分比自動判斷異常狀態並顯示警示標記
+   *
+   * 規則:
+   * - change < -20%: danger (紅色警示圖標)
+   * - -20% <= change < -10%: warning (黃色警示圖標)
+   * - change >= -10%: normal (綠色正常圖標，不顯示警示)
+   */
+  describe('anomaly markers (D-005)', () => {
+    describe('danger anomaly (change < -20%)', () => {
+      it('should show danger anomaly icon when change is -25%', () => {
+        render(<MetricCard {...defaultProps} change={-25} />);
+        const anomalyBadge = screen.getByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeDefined();
+        expect(anomalyBadge.textContent).toContain('⚠️');
+      });
+
+      it('should have danger styling when change is -25%', () => {
+        const { container } = render(
+          <MetricCard {...defaultProps} change={-25} />
+        );
+        const dangerBadge = container.querySelector('[data-anomaly="danger"]');
+        expect(dangerBadge).toBeDefined();
+      });
+
+      it('should show danger anomaly icon when change is -50%', () => {
+        render(<MetricCard {...defaultProps} change={-50} />);
+        const anomalyBadge = screen.getByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeDefined();
+      });
+    });
+
+    describe('warning anomaly (-20% <= change < -10%)', () => {
+      it('should show warning anomaly icon when change is -15%', () => {
+        render(<MetricCard {...defaultProps} change={-15} />);
+        const anomalyBadge = screen.getByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeDefined();
+        expect(anomalyBadge.textContent).toContain('⚡');
+      });
+
+      it('should have warning styling when change is -15%', () => {
+        const { container } = render(
+          <MetricCard {...defaultProps} change={-15} />
+        );
+        const warningBadge = container.querySelector('[data-anomaly="warning"]');
+        expect(warningBadge).toBeDefined();
+      });
+
+      it('should show warning anomaly icon when change is -20% (boundary)', () => {
+        render(<MetricCard {...defaultProps} change={-20} />);
+        const anomalyBadge = screen.getByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeDefined();
+      });
+    });
+
+    describe('normal (no anomaly marker for change >= -10%)', () => {
+      it('should not show anomaly marker when change is -5%', () => {
+        render(<MetricCard {...defaultProps} change={-5} />);
+        const anomalyBadge = screen.queryByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeNull();
+      });
+
+      it('should not show anomaly marker when change is -10% (boundary)', () => {
+        render(<MetricCard {...defaultProps} change={-10} />);
+        const anomalyBadge = screen.queryByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeNull();
+      });
+
+      it('should not show anomaly marker when change is 0%', () => {
+        render(<MetricCard {...defaultProps} change={0} />);
+        const anomalyBadge = screen.queryByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeNull();
+      });
+
+      it('should not show anomaly marker when change is positive (+10%)', () => {
+        render(<MetricCard {...defaultProps} change={10} />);
+        const anomalyBadge = screen.queryByTestId('anomaly-marker');
+        expect(anomalyBadge).toBeNull();
+      });
+    });
+
+    describe('anomaly marker accessibility', () => {
+      it('should have accessible title for danger anomaly', () => {
+        render(<MetricCard {...defaultProps} change={-25} />);
+        const anomalyBadge = screen.getByTitle('異常警示: 嚴重下降');
+        expect(anomalyBadge).toBeDefined();
+      });
+
+      it('should have accessible title for warning anomaly', () => {
+        render(<MetricCard {...defaultProps} change={-15} />);
+        const anomalyBadge = screen.getByTitle('異常警示: 中度下降');
+        expect(anomalyBadge).toBeDefined();
+      });
+    });
+  });
 });

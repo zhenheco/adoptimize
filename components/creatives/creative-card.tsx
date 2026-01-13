@@ -1,8 +1,10 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Image, Play, Layers, MoreVertical, Pause, PlayCircle } from 'lucide-react';
+import { Image, Play, Layers, Pause, PlayCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Creative, FatigueStatus } from '@/lib/api/types';
+import { FatigueAlert } from './fatigue-alert';
 
 /**
  * CreativeCard 元件屬性
@@ -14,6 +16,12 @@ export interface CreativeCardProps {
   onClick?: (creative: Creative) => void;
   /** 暫停/啟用素材的回調 */
   onToggleStatus?: (creative: Creative) => void;
+  /** 是否啟用選取模式 */
+  selectionMode?: boolean;
+  /** 是否已選取 */
+  isSelected?: boolean;
+  /** 選取狀態變更回調 */
+  onSelectionChange?: (creative: Creative) => void;
 }
 
 /**
@@ -88,9 +96,32 @@ export function CreativeCard({
   creative,
   onClick,
   onToggleStatus,
+  selectionMode = false,
+  isSelected = false,
+  onSelectionChange,
 }: CreativeCardProps) {
   const { name, type, thumbnail_url, metrics, fatigue, status } = creative;
   const isPaused = status === 'paused';
+
+  /**
+   * 處理卡片點擊
+   * 在選取模式下觸發選取變更，否則觸發 onClick
+   */
+  const handleCardClick = () => {
+    if (selectionMode) {
+      onSelectionChange?.(creative);
+    } else {
+      onClick?.(creative);
+    }
+  };
+
+  /**
+   * 處理 Checkbox 點擊
+   */
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelectionChange?.(creative);
+  };
 
   return (
     <div
@@ -98,12 +129,25 @@ export function CreativeCard({
         'bg-white dark:bg-gray-800 rounded-lg shadow-sm border overflow-hidden transition-all hover:shadow-md cursor-pointer',
         isPaused
           ? 'border-gray-300 dark:border-gray-600 opacity-75'
-          : 'border-gray-200 dark:border-gray-700'
+          : 'border-gray-200 dark:border-gray-700',
+        isSelected && 'ring-2 ring-blue-500 border-blue-500'
       )}
-      onClick={() => onClick?.(creative)}
+      onClick={handleCardClick}
     >
       {/* 縮圖區域 */}
       <div className="relative aspect-video bg-gray-100 dark:bg-gray-900">
+        {/* 選取 Checkbox */}
+        {selectionMode && (
+          <div
+            className="absolute top-2 right-2 z-10"
+            onClick={handleCheckboxClick}
+          >
+            <Checkbox
+              checked={isSelected}
+              className="bg-white dark:bg-gray-900 border-2"
+            />
+          </div>
+        )}
         {thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -123,9 +167,12 @@ export function CreativeCard({
           <span>{type}</span>
         </div>
 
-        {/* 狀態標籤 */}
+        {/* 狀態標籤 - 在選取模式下移到右下角避免與 Checkbox 重疊 */}
         {isPaused && (
-          <div className="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded">
+          <div className={cn(
+            'absolute bg-gray-500 text-white text-xs px-2 py-1 rounded',
+            selectionMode ? 'bottom-2 right-2' : 'top-2 right-2'
+          )}>
             已暫停
           </div>
         )}
@@ -180,6 +227,11 @@ export function CreativeCard({
               {metrics.impressions.toLocaleString()}
             </p>
           </div>
+        </div>
+
+        {/* 疲勞警示 */}
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <FatigueAlert fatigue={fatigue} />
         </div>
 
         {/* 疲勞度指標 */}

@@ -2,3 +2,4 @@
 export { ScoreRing } from './score-ring';
 export { IssueCard } from './issue-card';
 export { DimensionCard } from './dimension-card';
+export { RepairWizard } from './repair-wizard';

@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { AlertCircle, AlertTriangle, Info, CheckCircle, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info, CheckCircle, EyeOff, ChevronDown, ChevronUp, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import type { AuditIssue } from '@/lib/api/types';
 
@@ -15,6 +15,8 @@ interface IssueCardProps {
   onResolve?: (issueId: string) => void;
   /** 忽略問題 */
   onIgnore?: (issueId: string) => void;
+  /** 開啟修復指南 */
+  onOpenRepairGuide?: (issue: AuditIssue) => void;
 }
 
 /**
@@ -76,7 +78,7 @@ function getCategoryLabel(category: AuditIssue['category']) {
  *
  * 顯示單一健檢問題的詳細資訊，包含嚴重度、描述、影響和解決方案
  */
-export function IssueCard({ issue, onResolve, onIgnore }: IssueCardProps) {
+export function IssueCard({ issue, onResolve, onIgnore, onOpenRepairGuide }: IssueCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const severityStyles = getSeverityStyles(issue.severity);
   const isResolved = issue.status === 'resolved';
@@ -191,7 +193,19 @@ export function IssueCard({ issue, onResolve, onIgnore }: IssueCardProps) {
 
           {/* 操作按鈕 */}
           {issue.status === 'open' && (
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
+              {onOpenRepairGuide && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRepairGuide(issue);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  <Wrench className="w-4 h-4" />
+                  修復指南
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();

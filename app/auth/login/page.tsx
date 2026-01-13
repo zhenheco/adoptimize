@@ -1,41 +1,91 @@
-'use client';
+'use client'
 
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 /**
  * 登入頁面
  *
- * 目前為 Mock 登入模式（開發階段）：
- * - 點擊登入按鈕直接跳轉到 dashboard
- * - 無實際認證驗證
- *
- * TODO: 連接實際 OAuth 流程
+ * 支援：
+ * - Email/密碼登入
+ * - Google OAuth 登入（憑證待準備）
+ * - Meta OAuth 登入（憑證待準備）
  */
 export default function LoginPage() {
-  const router = useRouter();
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  /**
+   * 處理 Email/密碼登入
+   */
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error?.message || data.detail?.message || '登入失敗')
+        return
+      }
+
+      // 存儲 access token 到 localStorage
+      if (data.data?.access_token) {
+        localStorage.setItem('access_token', data.data.access_token)
+        localStorage.setItem('user', JSON.stringify(data.data.user))
+      }
+
+      // 跳轉到 dashboard
+      router.push('/dashboard')
+    } catch (err) {
+      setError('無法連接到伺服器，請稍後再試')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   /**
    * 處理 Google 登入
-   * Mock 模式：直接跳轉到 dashboard
+   * OAuth 憑證尚未準備，目前為模擬模式
    */
   const handleGoogleLogin = () => {
     // TODO: 實際 OAuth 流程
     // window.location.href = '/api/v1/accounts/connect/google';
-    router.push('/dashboard');
-  };
+    router.push('/dashboard')
+  }
 
   /**
    * 處理 Meta 登入
-   * Mock 模式：直接跳轉到 dashboard
+   * OAuth 憑證尚未準備，目前為模擬模式
    */
   const handleMetaLogin = () => {
     // TODO: 實際 OAuth 流程
     // window.location.href = '/api/v1/accounts/connect/meta';
-    router.push('/dashboard');
-  };
+    router.push('/dashboard')
+  }
 
   return (
     <Card className="w-full max-w-md mx-4 shadow-xl">
@@ -48,7 +98,9 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <CardTitle className="text-2xl font-bold">歡迎使用 AdOptimize</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            歡迎使用 AdOptimize
+          </CardTitle>
           <CardDescription className="text-base mt-2">
             跨平台廣告優化工具
           </CardDescription>
@@ -56,11 +108,76 @@ export default function LoginPage() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Email/密碼登入表單 */}
+        <form onSubmit={handleEmailLogin} className="space-y-4">
+          <div className="space-y-2">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isLoading}
+              className="h-12"
+            />
+          </div>
+          <div className="space-y-2">
+            <Input
+              type="password"
+              placeholder="密碼"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+              className="h-12"
+            />
+          </div>
+
+          {/* 錯誤訊息 */}
+          {error && (
+            <div className="text-sm text-red-600 dark:text-red-400 text-center bg-red-50 dark:bg-red-900/20 p-2 rounded">
+              {error}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full h-12 text-base font-medium"
+            disabled={isLoading}
+          >
+            {isLoading ? '登入中...' : '登入'}
+          </Button>
+        </form>
+
+        {/* 註冊連結 */}
+        <div className="text-center text-sm">
+          <span className="text-gray-500">還沒有帳號？</span>{' '}
+          <Link
+            href="/auth/register"
+            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+          >
+            立即註冊
+          </Link>
+        </div>
+
+        {/* 分隔線 */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
+              或使用平台帳號
+            </span>
+          </div>
+        </div>
+
         {/* Google 登入按鈕 */}
         <Button
           variant="outline"
           className="w-full h-12 text-base font-medium relative"
           onClick={handleGoogleLogin}
+          disabled={isLoading}
         >
           <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -90,6 +207,7 @@ export default function LoginPage() {
           variant="outline"
           className="w-full h-12 text-base font-medium relative"
           onClick={handleMetaLogin}
+          disabled={isLoading}
         >
           <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#1877F2">
@@ -99,23 +217,9 @@ export default function LoginPage() {
           使用 Meta 帳號登入
         </Button>
 
-        {/* 分隔線 */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-              開發模式
-            </span>
-          </div>
-        </div>
-
         {/* 提示訊息 */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-          點擊任一按鈕將直接進入儀表板
-          <br />
-          <span className="text-xs">（實際 OAuth 功能開發中）</span>
+        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
+          OAuth 登入功能開發中，目前點擊將直接進入儀表板
         </p>
 
         {/* 返回首頁連結 */}
@@ -129,5 +233,5 @@ export default function LoginPage() {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

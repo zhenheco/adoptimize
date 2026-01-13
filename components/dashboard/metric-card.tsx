@@ -1,4 +1,4 @@
-import { cn, formatChange, getStatusIcon } from '@/lib/utils';
+import { cn, formatChange, getStatusIcon, getAnomalyStatus, type AnomalyStatus } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { TermTooltip } from '@/components/ui/term-tooltip';
 
@@ -23,6 +23,32 @@ export interface MetricCardProps {
   invertChange?: boolean;
   /** 術語 ID，用於顯示解釋 Tooltip */
   termId?: string;
+}
+
+/**
+ * 取得異常標記的圖示和樣式
+ */
+function getAnomalyMarkerInfo(anomalyStatus: AnomalyStatus): {
+  icon: string;
+  title: string;
+  className: string;
+} | null {
+  switch (anomalyStatus) {
+    case 'danger':
+      return {
+        icon: '⚠️',
+        title: '異常警示: 嚴重下降',
+        className: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800',
+      };
+    case 'warning':
+      return {
+        icon: '⚡',
+        title: '異常警示: 中度下降',
+        className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+      };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -63,6 +89,10 @@ export function MetricCard({
     ? 'text-green-600 dark:text-green-400'
     : 'text-red-600 dark:text-red-400';
 
+  // D-005: 計算異常狀態
+  const anomalyStatus = getAnomalyStatus(change);
+  const anomalyMarker = getAnomalyMarkerInfo(anomalyStatus);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
       {/* 標題與狀態 */}
@@ -71,9 +101,25 @@ export function MetricCard({
           {title}
           {termId && <TermTooltip termId={termId} />}
         </span>
-        <span className="text-sm" title={`狀態: ${status}`}>
-          {getStatusIcon(status)}
-        </span>
+        <div className="flex items-center gap-1">
+          {/* D-005: 異常警示標記 */}
+          {anomalyMarker && (
+            <span
+              data-testid="anomaly-marker"
+              data-anomaly={anomalyStatus}
+              title={anomalyMarker.title}
+              className={cn(
+                'text-xs px-1.5 py-0.5 rounded border',
+                anomalyMarker.className
+              )}
+            >
+              {anomalyMarker.icon}
+            </span>
+          )}
+          <span className="text-sm" title={`狀態: ${status}`}>
+            {getStatusIcon(status)}
+          </span>
+        </div>
       </div>
 
       {/* 數值 */}

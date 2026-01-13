@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useCreatives, type CreativeFilters } from '@/hooks/use-creatives';
+import { useBatchSelection } from '@/hooks/use-batch-selection';
 import { CreativeCard } from '@/components/creatives/creative-card';
+import { BatchConfirmDialog, type BatchAction } from '@/components/creatives/batch-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Filter, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RefreshCw, Filter, AlertTriangle, Pause, PlayCircle, X, CheckSquare } from 'lucide-react';
 import type { Creative } from '@/lib/api/types';
 
 /**
@@ -66,7 +69,7 @@ function FilterButton({
  * 素材管理頁面
  *
  * 顯示所有廣告素材及其效能指標
- * 支援篩選、排序和分頁
+ * 支援篩選、排序、分頁和批次操作
  */
 export default function CreativesPage() {
   const [filters, setFilters] = useState<CreativeFilters>({
@@ -76,8 +79,31 @@ export default function CreativesPage() {
     sortOrder: 'desc',
   });
 
+  // 選取模式狀態
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  // 批次操作對話框狀態
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [batchAction, setBatchAction] = useState<BatchAction>('pause');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [batchError, setBatchError] = useState<string | undefined>();
+
   const { creatives, isLoading, error, pagination, refetch, toggleStatus } =
     useCreatives(filters);
+
+  // 批次選取 Hook
+  const {
+    selectedCount,
+    isAllSelected,
+    activeSelectedCount,
+    pausedSelectedCount,
+    toggleSelection,
+    isSelected,
+    toggleAll,
+    clearSelection,
+    getActiveSelectedItems,
+    getPausedSelectedItems,
+  } = useBatchSelection(creatives);
 
   // 處理素材點擊（未來可開啟詳情頁）
   const handleCreativeClick = (creative: Creative) => {
@@ -101,6 +127,70 @@ export default function CreativesPage() {
     }));
   };
 
+  // 進入選取模式
+  const enterSelectionMode = () => {
+    setSelectionMode(true);
+  };
+
+  // 退出選取模式
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    clearSelection();
+  };
+
+  // 開啟批次暫停對話框
+  const openBatchPauseDialog = () => {
+    setBatchAction('pause');
+    setBatchError(undefined);
+    setDialogOpen(true);
+  };
+
+  // 開啟批次啟用對話框
+  const openBatchEnableDialog = () => {
+    setBatchAction('enable');
+    setBatchError(undefined);
+    setDialogOpen(true);
+  };
+
+  // 執行批次操作
+  const executeBatchAction = async () => {
+    setIsExecuting(true);
+    setBatchError(undefined);
+
+    try {
+      const items = batchAction === 'pause'
+        ? getActiveSelectedItems()
+        : getPausedSelectedItems();
+
+      const action = batchAction === 'pause' ? 'pause' : 'enable';
+
+      // 呼叫批次 API
+      const response = await fetch('/api/v1/creatives/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          ids: items.map(item => item.id),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `批次${action === 'pause' ? '暫停' : '啟用'}失敗`);
+      }
+
+      // 成功後關閉對話框、清除選取並重新整理
+      setDialogOpen(false);
+      clearSelection();
+      setSelectionMode(false);
+      refetch();
+    } catch (err) {
+      setBatchError(err instanceof Error ? err.message : '批次操作失敗');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   // 計算各狀態數量（用於顯示）
   const fatigueCount = creatives.filter(
     (c) => c.fatigue.status === 'fatigued'
@@ -121,21 +211,94 @@ export default function CreativesPage() {
             管理廣告素材、追蹤疲勞度與效能
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw
-            className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
-          />
-          重新整理
-        </Button>
+        <div className="flex items-center gap-2">
+          {!selectionMode ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={enterSelectionMode}
+                disabled={isLoading || creatives.length === 0}
+              >
+                <CheckSquare className="w-4 h-4 mr-2" />
+                批次操作
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+                />
+                重新整理
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exitSelectionMode}
+            >
+              <X className="w-4 h-4 mr-2" />
+              取消選取
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* 選取模式工具列 */}
+      {selectionMode && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* 全選 Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={toggleAll}
+                />
+                <span className="text-sm text-blue-800 dark:text-blue-200">
+                  全選
+                </span>
+              </label>
+              {/* 已選取數量 */}
+              <span className="text-sm text-blue-700 dark:text-blue-300">
+                已選取 {selectedCount} 個素材
+                {activeSelectedCount > 0 && ` (${activeSelectedCount} 個活躍)`}
+                {pausedSelectedCount > 0 && ` (${pausedSelectedCount} 個暫停)`}
+              </span>
+            </div>
+            {/* 批次操作按鈕 */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openBatchPauseDialog}
+                disabled={activeSelectedCount === 0}
+                className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+              >
+                <Pause className="w-4 h-4 mr-2" />
+                批次暫停 ({activeSelectedCount})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openBatchEnableDialog}
+                disabled={pausedSelectedCount === 0}
+                className="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+              >
+                <PlayCircle className="w-4 h-4 mr-2" />
+                批次啟用 ({pausedSelectedCount})
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 疲勞警示摘要 */}
-      {(fatigueCount > 0 || warningCount > 0) && (
+      {!selectionMode && (fatigueCount > 0 || warningCount > 0) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
@@ -249,6 +412,9 @@ export default function CreativesPage() {
                 creative={creative}
                 onClick={handleCreativeClick}
                 onToggleStatus={toggleStatus}
+                selectionMode={selectionMode}
+                isSelected={isSelected(creative.id)}
+                onSelectionChange={(c) => toggleSelection(c.id)}
               />
             ))}
           </div>
@@ -263,6 +429,17 @@ export default function CreativesPage() {
           </div>
         </>
       )}
+
+      {/* 批次操作確認對話框 */}
+      <BatchConfirmDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        action={batchAction}
+        items={batchAction === 'pause' ? getActiveSelectedItems() : getPausedSelectedItems()}
+        onConfirm={executeBatchAction}
+        isLoading={isExecuting}
+        error={batchError}
+      />
     </div>
   );
 }

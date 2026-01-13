@@ -166,7 +166,70 @@ export interface Recommendation {
   description: string;
   action_module: string;
   estimated_impact: number;
-  status: 'pending' | 'executed' | 'ignored';
+  status: 'pending' | 'executed' | 'ignored' | 'snoozed';
+  /** 延後到期時間（ISO 格式） */
+  snooze_until?: string;
+}
+
+/**
+ * 通知類型
+ */
+export type NotificationType = 'alert' | 'recommendation' | 'system' | 'info';
+
+/**
+ * 通知嚴重度
+ */
+export type NotificationSeverity = 'info' | 'warning' | 'error' | 'critical';
+
+/**
+ * 通知
+ */
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  severity: NotificationSeverity;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+/**
+ * 廣告帳戶狀態
+ */
+export type AccountStatus = 'active' | 'paused' | 'removed' | 'pending';
+
+/**
+ * 廣告帳戶
+ */
+export interface AdAccount {
+  id: string;
+  platform: Platform;
+  external_id: string;
+  name: string;
+  currency: string;
+  timezone: string;
+  status: AccountStatus;
+  last_sync_at?: string;
+  created_at: string;
+}
+
+/**
+ * 訂閱層級
+ */
+export type SubscriptionTier = 'STARTER' | 'PROFESSIONAL' | 'AGENCY' | 'ENTERPRISE';
+
+/**
+ * 執行限制資訊
+ */
+export interface ActionLimitInfo {
+  can_execute: boolean;
+  remaining_actions?: number;
+  limit?: number;
+  current_count: number;
+  resets_at: string;
 }
 
 /**
@@ -177,8 +240,11 @@ export interface ApiResponse<T> {
   meta?: {
     page?: number;
     total?: number;
+    total_pages?: number;
+    unread_count?: number;
     period?: { start: string; end: string };
   };
+  summary?: Record<string, unknown>;
 }
 
 /**
@@ -190,4 +256,158 @@ export interface ApiError {
     message: string;
     details?: Record<string, unknown>;
   };
+}
+
+// ============================================================
+// 智慧受眾建議相關類型
+// ============================================================
+
+/**
+ * 產業選項
+ */
+export interface IndustryOption {
+  code: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * 廣告目標選項
+ */
+export interface ObjectiveOption {
+  code: string;
+  name: string;
+  funnel_stage: string;
+  description: string;
+}
+
+/**
+ * 選項回應
+ */
+export interface SuggestionOptionsResponse {
+  industries: IndustryOption[];
+  objectives: ObjectiveOption[];
+}
+
+/**
+ * 建議的興趣標籤
+ */
+export interface SuggestedInterest {
+  meta_interest_id: string;
+  name: string;
+  name_zh: string;
+  relevance_score: number;
+  reason: string;
+  estimated_reach?: number;
+}
+
+/**
+ * 智慧建議狀態
+ */
+export type SuggestionStatus = 'generated' | 'saved' | 'executed';
+
+/**
+ * 智慧受眾建議
+ */
+export interface AudienceSuggestion {
+  id: string;
+  account_id: string;
+  industry_code: string;
+  objective_code: string;
+  suggested_interests: SuggestedInterest[];
+  reasoning?: string;
+  budget_allocation?: {
+    awareness: number;
+    consideration: number;
+    conversion: number;
+    retention: number;
+  };
+  creative_recommendations?: string[];
+  suggested_ad_copy?: string;
+  estimated_reach_lower?: number;
+  estimated_reach_upper?: number;
+  estimated_cpa?: number;
+  estimated_roas?: number;
+  confidence_score?: number;
+  status: SuggestionStatus;
+  meta_audience_id?: string;
+  meta_adset_id?: string;
+  meta_ad_id?: string;
+  created_at: string;
+  // 功能權限
+  can_view_full: boolean;
+  can_create_audience: boolean;
+  can_create_ad: boolean;
+  hidden_interests_count?: number;
+}
+
+/**
+ * 智慧建議使用限制
+ */
+export interface SuggestionLimit {
+  can_generate: boolean;
+  remaining_suggestions?: number;
+  limit?: number;
+  current_count: number;
+  resets_at: string;
+  message: string;
+  features: {
+    can_view_full_report: boolean;
+    can_create_audience: boolean;
+    can_create_ad: boolean;
+    has_api_access: boolean;
+    max_visible_interests: number;
+  };
+}
+
+/**
+ * 生成建議請求
+ */
+export interface GenerateSuggestionRequest {
+  account_id: string;
+  industry_code: string;
+  objective_code: string;
+  additional_context?: string;
+}
+
+/**
+ * 建立受眾請求
+ */
+export interface SaveAudienceRequest {
+  audience_name?: string;
+}
+
+/**
+ * 建立受眾回應
+ */
+export interface SaveAudienceResponse {
+  success: boolean;
+  suggestion_id: string;
+  meta_audience_id?: string;
+  audience_name: string;
+  message: string;
+}
+
+/**
+ * 建立廣告請求
+ */
+export interface CreateAdRequest {
+  campaign_id: string;
+  daily_budget: number;
+  ad_name?: string;
+  use_suggested_copy?: boolean;
+  custom_ad_copy?: string;
+}
+
+/**
+ * 建立廣告回應
+ */
+export interface CreateAdResponse {
+  success: boolean;
+  suggestion_id: string;
+  meta_adset_id?: string;
+  meta_ad_id?: string;
+  adset_name: string;
+  ad_name: string;
+  message: string;
 }

@@ -14,9 +14,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.audience import Audience
+    from app.models.audience_suggestion import AudienceSuggestion
     from app.models.campaign import Campaign
     from app.models.creative import Creative
-    from app.models.audience import Audience
     from app.models.health_audit import HealthAudit
     from app.models.recommendation import Recommendation
     from app.models.user import User
@@ -95,6 +96,11 @@ class AdAccount(Base):
     )
     recommendations: Mapped[list["Recommendation"]] = relationship(
         "Recommendation",
+        back_populates="account",
+        cascade="all, delete-orphan",
+    )
+    audience_suggestions: Mapped[list["AudienceSuggestion"]] = relationship(
+        "AudienceSuggestion",
         back_populates="account",
         cascade="all, delete-orphan",
     )

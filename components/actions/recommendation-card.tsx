@@ -13,9 +13,16 @@ import {
   Loader2,
   CheckCircle2,
   Ban,
+  Clock,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Recommendation } from '@/lib/api/types';
+import {
+  getSnoozeOptions,
+  formatSnoozeRemaining,
+  type SnoozeDuration,
+} from '@/lib/utils/snooze-utils';
 
 /**
  * 取得建議類型圖示與顏色
@@ -115,6 +122,7 @@ interface RecommendationCardProps {
   recommendation: Recommendation;
   onExecute: (recommendation: Recommendation) => Promise<void>;
   onIgnore: (recommendation: Recommendation) => Promise<void>;
+  onSnooze?: (recommendation: Recommendation, duration: SnoozeDuration) => Promise<void>;
 }
 
 /**
@@ -126,12 +134,16 @@ export function RecommendationCard({
   recommendation,
   onExecute,
   onIgnore,
+  onSnooze,
 }: RecommendationCardProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isIgnoring, setIsIgnoring] = useState(false);
+  const [isSnoozeing, setIsSnoozeing] = useState(false);
+  const [showSnoozeMenu, setShowSnoozeMenu] = useState(false);
 
   const typeInfo = getTypeInfo(recommendation.type);
   const priorityInfo = getPriorityLabel(recommendation.priority_score);
+  const snoozeOptions = getSnoozeOptions();
 
   const handleExecute = async () => {
     setIsExecuting(true);
@@ -154,6 +166,22 @@ export function RecommendationCard({
       setIsIgnoring(false);
     }
   };
+
+  const handleSnooze = async (duration: SnoozeDuration) => {
+    if (!onSnooze) return;
+
+    setIsSnoozeing(true);
+    setShowSnoozeMenu(false);
+    try {
+      await onSnooze(recommendation, duration);
+    } catch (error) {
+      console.error('Snooze failed:', error);
+    } finally {
+      setIsSnoozeing(false);
+    }
+  };
+
+  const isLoading = isExecuting || isIgnoring || isSnoozeing;
 
   // 根據狀態顯示不同的 UI
   if (recommendation.status === 'executed') {
@@ -179,6 +207,40 @@ export function RecommendationCard({
             <span className="font-medium text-gray-500 dark:text-gray-400">已忽略</span>
             <span className="text-gray-400 dark:text-gray-500 ml-2">{recommendation.title}</span>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (recommendation.status === 'snoozed') {
+    return (
+      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Clock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            <div>
+              <span className="font-medium text-amber-800 dark:text-amber-300">已延後</span>
+              <span className="text-amber-600 dark:text-amber-400 ml-2">{recommendation.title}</span>
+              {recommendation.snooze_until && (
+                <span className="text-amber-500 dark:text-amber-500 ml-2 text-sm">
+                  ({formatSnoozeRemaining(recommendation.snooze_until)})
+                </span>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExecute}
+            disabled={isLoading}
+          >
+            {isExecuting ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <PlayCircle className="w-4 h-4 mr-1" />
+            )}
+            立即執行
+          </Button>
         </div>
       </div>
     );
@@ -227,7 +289,7 @@ export function RecommendationCard({
           <Button
             size="sm"
             onClick={handleExecute}
-            disabled={isExecuting || isIgnoring}
+            disabled={isLoading}
           >
             {isExecuting ? (
               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -236,11 +298,49 @@ export function RecommendationCard({
             )}
             執行
           </Button>
+
+          {/* 延後處理按鈕 */}
+          {onSnooze && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSnoozeMenu(!showSnoozeMenu)}
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isSnoozeing ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Clock className="w-4 h-4 mr-1" />
+                )}
+                稍後
+                <ChevronDown className="w-3 h-3 ml-1" />
+              </Button>
+
+              {/* 延後選項下拉選單 */}
+              {showSnoozeMenu && (
+                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
+                  {snoozeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSnooze(option.value)}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleIgnore}
-            disabled={isExecuting || isIgnoring}
+            disabled={isLoading}
+            className="text-gray-500 hover:text-gray-700"
           >
             {isIgnoring ? (
               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
