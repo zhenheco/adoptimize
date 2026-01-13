@@ -16,6 +16,15 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const redirectUri = searchParams.get('redirect_uri');
 
+    // 取得前端傳入的 Authorization header
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: '請先登入才能連接廣告帳戶' },
+        { status: 401 }
+      );
+    }
+
     // 如果沒有提供 redirect_uri，使用預設值
     const finalRedirectUri =
       redirectUri || `${request.nextUrl.origin}/api/v1/accounts/callback/google`;
@@ -26,6 +35,7 @@ export async function GET(request: NextRequest) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: authHeader, // 轉發認證 header 到後端
         },
       }
     );
