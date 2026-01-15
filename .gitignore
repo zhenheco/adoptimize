@@ -58,6 +58,9 @@ out/
 *~
 .DS_Store
 
+# Claude Code 記憶檔案
+**/CLAUDE.md
+
 # Logs
 logs/
 *.log
