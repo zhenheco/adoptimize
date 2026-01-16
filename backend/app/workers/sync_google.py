@@ -197,8 +197,9 @@ def sync_campaigns(account_id: str):
         account_id: 帳戶 UUID
     """
     logger.info(f"Syncing campaigns for account: {account_id}")
-    # TODO: 實作 campaigns 同步
-    return {"status": "completed", "campaigns_synced": 0}
+    # TODO: 實作 Google Ads campaigns 同步（使用 Google Ads API）
+    # 目前專注於 Meta API 整合，Google Ads 將在後續版本實作
+    return {"status": "not_implemented", "campaigns_synced": 0, "message": "Google Ads sync not yet implemented"}
 
 
 @celery_app.task(name="app.workers.sync_google.sync_metrics")
@@ -211,5 +212,6 @@ def sync_metrics(account_id: str, date_range: str = "LAST_7_DAYS"):
         date_range: 日期範圍，預設最近 7 天
     """
     logger.info(f"Syncing metrics for account: {account_id}, range: {date_range}")
-    # TODO: 實作 metrics 同步
-    return {"status": "completed", "metrics_synced": 0}
+    # TODO: 實作 Google Ads metrics 同步（使用 Google Ads API）
+    # 目前專注於 Meta API 整合，Google Ads 將在後續版本實作
+    return {"status": "not_implemented", "metrics_synced": 0, "message": "Google Ads sync not yet implemented"}

@@ -26,6 +26,7 @@ from app.core.security import (
     verify_token,
 )
 from app.db.base import get_db
+from app.middleware.auth import get_current_user as get_authenticated_user
 from app.models.user import User
 
 router = APIRouter()
@@ -323,20 +324,18 @@ async def refresh_token(
     },
 )
 async def get_current_user(
-    db: AsyncSession = Depends(get_db),
-    # TODO: 添加認證依賴
+    current_user: User = Depends(get_authenticated_user),
 ) -> dict:
     """
     取得當前登入用戶資訊
 
     需要有效的 access token
     """
-    # TODO: 從 token 中取得用戶 ID，然後查詢用戶資訊
-    # 這個端點將在實作認證中間件後完成
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail={
-            "code": "NOT_IMPLEMENTED",
-            "message": "此功能尚未實作",
-        },
-    )
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "company": current_user.company,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+    }

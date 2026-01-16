@@ -22,11 +22,14 @@ from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
 from app.models import Creative as CreativeModel, CreativeMetrics as CreativeMetricsModel
+from app.models.ad import Ad
 from app.services.fatigue_score import (
     FatigueInput,
     calculate_fatigue_score,
     get_fatigue_status,
 )
+from app.services.meta_api_client import MetaAPIClient
+from app.core.exceptions import MetaAPIError, TokenExpiredError
 
 router = APIRouter()
 
@@ -78,60 +81,6 @@ class CreativeActionResponse(BaseModel):
     creative_id: str
     new_status: str
     message: str
-
-
-def _generate_mock_creatives(count: int = 12) -> list[Creative]:
-    """產生模擬素材資料"""
-    creative_types = ["IMAGE", "VIDEO", "CAROUSEL"]
-    creatives = []
-
-    for i in range(count):
-        creative_type = creative_types[i % 3]
-
-        # 隨機生成疲勞度相關數據
-        ctr_change = -5 - (i * 3)  # 模擬不同程度的 CTR 下降
-        frequency = 2.0 + (i * 0.2)
-        days_active = 7 + (i * 3)
-        conversion_change = -2 - (i * 2)
-
-        # 計算疲勞度
-        fatigue_input = FatigueInput(
-            ctr_change=ctr_change,
-            frequency=frequency,
-            days_active=days_active,
-            conversion_rate_change=conversion_change,
-        )
-        fatigue_result = calculate_fatigue_score(fatigue_input)
-        status = get_fatigue_status(fatigue_result.score)
-
-        # 根據疲勞度決定素材狀態
-        creative_status = "paused" if fatigue_result.score > 80 else "active"
-
-        creatives.append(
-            Creative(
-                id=str(uuid.uuid4()),
-                name=f"Creative {i + 1} - {creative_type}",
-                type=creative_type,
-                thumbnail_url=f"https://picsum.photos/seed/{i}/300/200",
-                metrics=CreativeMetrics(
-                    impressions=10000 + (i * 1000),
-                    clicks=500 + (i * 50),
-                    ctr=5.0 - (i * 0.3),
-                    conversions=25 + (i * 2),
-                    spend=150.0 + (i * 20),
-                ),
-                fatigue=CreativeFatigue(
-                    score=fatigue_result.score,
-                    status=status.value,
-                    ctr_change=ctr_change,
-                    frequency=frequency,
-                    days_active=days_active,
-                ),
-                status=creative_status,
-            )
-        )
-
-    return creatives
 
 
 def _calculate_fatigue_from_metrics(creative_record: CreativeModel) -> tuple[int, str, float, float, int]:
@@ -267,11 +216,8 @@ async def get_creatives(
     result = await db.execute(query)
     creative_records = result.scalars().all()
 
-    # 如果資料庫無資料，返回模擬數據
-    if not creative_records:
-        all_creatives = _generate_mock_creatives(36)
-    else:
-        all_creatives = [_convert_db_creative_to_response(c) for c in creative_records]
+    # 返回真實資料（空陣列如果無資料）
+    all_creatives = [_convert_db_creative_to_response(c) for c in creative_records]
 
     # 疲勞狀態篩選（需在轉換後進行）
     if fatigue_status:
@@ -352,6 +298,8 @@ async def pause_creative(
     """
     暫停素材
 
+    AC-A2: 實際呼叫 Meta API 暫停使用該素材的廣告
+
     Args:
         creative_id: 素材 ID
         db: 資料庫 session
@@ -365,29 +313,60 @@ async def pause_creative(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid creative ID format")
 
-    # 從資料庫取得素材
+    # 從資料庫取得素材，包含關聯的 account 和 ads
     result = await db.execute(
-        select(CreativeModel).where(CreativeModel.id == creative_uuid)
+        select(CreativeModel)
+        .options(
+            selectinload(CreativeModel.account),
+            selectinload(CreativeModel.ads),
+        )
+        .where(CreativeModel.id == creative_uuid)
     )
     creative_record = result.scalar_one_or_none()
 
     if not creative_record:
-        # 模擬模式：如果資料庫無資料，仍返回成功
-        return CreativeActionResponse(
-            success=True,
-            creative_id=creative_id,
-            new_status="paused",
-            message="Creative paused successfully (simulated)",
+        raise HTTPException(status_code=404, detail="Creative not found")
+
+    # 取得帳戶資訊
+    account = creative_record.account
+    if not account or not account.access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Account not connected or missing access token",
         )
 
-    # TODO: 呼叫廣告平台 API 暫停素材
-    # 目前僅記錄操作，實際暫停需要平台 API
+    # AC-A2: 呼叫 Meta API 暫停使用該 creative 的所有 ads
+    paused_ads = []
+    errors = []
+
+    if creative_record.ads:
+        client = MetaAPIClient(
+            access_token=account.access_token,
+            ad_account_id=account.external_id,
+        )
+
+        for ad in creative_record.ads:
+            if ad.external_id:
+                try:
+                    await client.update_ad_status(ad.external_id, "PAUSED")
+                    paused_ads.append(ad.external_id)
+                except TokenExpiredError:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Access token expired. Please reconnect your account.",
+                    )
+                except MetaAPIError as e:
+                    errors.append(f"Ad {ad.external_id}: {e.message}")
+
+    message = f"Paused {len(paused_ads)} ads using this creative"
+    if errors:
+        message += f". Errors: {'; '.join(errors)}"
 
     return CreativeActionResponse(
-        success=True,
+        success=len(errors) == 0,
         creative_id=creative_id,
         new_status="paused",
-        message="Creative paused successfully",
+        message=message,
     )
 
 
@@ -399,6 +378,8 @@ async def enable_creative(
     """
     啟用素材
 
+    AC-A2: 實際呼叫 Meta API 啟用使用該素材的廣告
+
     Args:
         creative_id: 素材 ID
         db: 資料庫 session
@@ -412,28 +393,60 @@ async def enable_creative(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid creative ID format")
 
-    # 從資料庫取得素材
+    # 從資料庫取得素材，包含關聯的 account 和 ads
     result = await db.execute(
-        select(CreativeModel).where(CreativeModel.id == creative_uuid)
+        select(CreativeModel)
+        .options(
+            selectinload(CreativeModel.account),
+            selectinload(CreativeModel.ads),
+        )
+        .where(CreativeModel.id == creative_uuid)
     )
     creative_record = result.scalar_one_or_none()
 
     if not creative_record:
-        # 模擬模式
-        return CreativeActionResponse(
-            success=True,
-            creative_id=creative_id,
-            new_status="active",
-            message="Creative enabled successfully (simulated)",
+        raise HTTPException(status_code=404, detail="Creative not found")
+
+    # 取得帳戶資訊
+    account = creative_record.account
+    if not account or not account.access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Account not connected or missing access token",
         )
 
-    # TODO: 呼叫廣告平台 API 啟用素材
+    # AC-A2: 呼叫 Meta API 啟用使用該 creative 的所有 ads
+    enabled_ads = []
+    errors = []
+
+    if creative_record.ads:
+        client = MetaAPIClient(
+            access_token=account.access_token,
+            ad_account_id=account.external_id,
+        )
+
+        for ad in creative_record.ads:
+            if ad.external_id:
+                try:
+                    await client.update_ad_status(ad.external_id, "ACTIVE")
+                    enabled_ads.append(ad.external_id)
+                except TokenExpiredError:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Access token expired. Please reconnect your account.",
+                    )
+                except MetaAPIError as e:
+                    errors.append(f"Ad {ad.external_id}: {e.message}")
+
+    message = f"Enabled {len(enabled_ads)} ads using this creative"
+    if errors:
+        message += f". Errors: {'; '.join(errors)}"
 
     return CreativeActionResponse(
-        success=True,
+        success=len(errors) == 0,
         creative_id=creative_id,
         new_status="active",
-        message="Creative enabled successfully",
+        message=message,
     )
 
 
@@ -460,11 +473,8 @@ async def get_fatigued_creatives(
     )
     creative_records = result.scalars().all()
 
-    # 如果資料庫無資料，返回模擬數據
-    if not creative_records:
-        all_creatives = _generate_mock_creatives(36)
-    else:
-        all_creatives = [_convert_db_creative_to_response(c) for c in creative_records]
+    # 返回真實資料（空陣列如果無資料）
+    all_creatives = [_convert_db_creative_to_response(c) for c in creative_records]
 
     # 篩選超過門檻的素材
     fatigued = [c for c in all_creatives if c.fatigue.score >= threshold]

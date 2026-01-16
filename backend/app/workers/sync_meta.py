@@ -15,13 +15,15 @@ import asyncio
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.db.base import async_session_factory
+from app.core.exceptions import SyncError, TokenExpiredError, RateLimitError
+from app.db.base import async_session_maker
 from app.models.ad_account import AdAccount
 from app.models.campaign import Campaign
 from app.models.ad_set import AdSet
@@ -30,6 +32,7 @@ from app.models.creative import Creative
 from app.models.creative_metrics import CreativeMetrics
 from app.models.audience import Audience
 from app.models.audience_metrics import AudienceMetrics
+from app.services.meta_api_client import MetaAPIClient
 from app.services.token_manager import TokenManager
 from app.workers.celery_app import celery_app
 
@@ -39,7 +42,7 @@ settings = get_settings()
 
 async def _get_meta_accounts() -> list[AdAccount]:
     """取得所有活躍的 Meta Ads 帳戶"""
-    async with async_session_factory() as session:
+    async with async_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(
                 AdAccount.platform == "meta",
@@ -91,7 +94,7 @@ async def _sync_meta_account(account_id: str) -> dict:
     Returns:
         同步結果
     """
-    async with async_session_factory() as session:
+    async with async_session_maker() as session:
         # 1. 取得帳戶資訊
         result = await session.execute(
             select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
@@ -193,14 +196,465 @@ def sync_account(self, account_id: str):
 @celery_app.task(name="app.workers.sync_meta.sync_campaigns")
 def sync_campaigns(account_id: str):
     """
-    同步帳戶的廣告活動
+    同步帳戶的廣告活動（Celery Task）
 
     Args:
         account_id: 帳戶 UUID
     """
     logger.info(f"Syncing campaigns for account: {account_id}")
-    # TODO: 實作 campaigns 同步
-    return {"status": "completed", "campaigns_synced": 0}
+    return asyncio.run(_sync_campaigns_task(account_id))
+
+
+async def _sync_campaigns_task(account_id: str) -> dict[str, Any]:
+    """執行 campaigns 同步的異步任務"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
+        )
+        account = result.scalar_one_or_none()
+
+        if not account:
+            return {"status": "error", "error": "Account not found"}
+
+        return await sync_campaigns_for_account(session, account)
+
+
+def _parse_campaign_data(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    解析 Meta API 回傳的 campaign 資料
+
+    Args:
+        raw: Meta API 回傳的原始資料
+
+    Returns:
+        轉換後的資料庫欄位格式
+    """
+    # 解析預算
+    budget_type = None
+    budget_amount = None
+
+    if "daily_budget" in raw and raw["daily_budget"]:
+        budget_type = "DAILY"
+        # Meta 預算以「美分」為單位，需除以 100
+        budget_amount = Decimal(raw["daily_budget"]) / 100
+    elif "lifetime_budget" in raw and raw["lifetime_budget"]:
+        budget_type = "LIFETIME"
+        budget_amount = Decimal(raw["lifetime_budget"]) / 100
+
+    # 解析日期
+    start_date = None
+    end_date = None
+
+    if "start_time" in raw and raw["start_time"]:
+        try:
+            start_date = datetime.fromisoformat(
+                raw["start_time"].replace("+0000", "+00:00")
+            ).date()
+        except (ValueError, AttributeError):
+            pass
+
+    if "stop_time" in raw and raw["stop_time"]:
+        try:
+            end_date = datetime.fromisoformat(
+                raw["stop_time"].replace("+0000", "+00:00")
+            ).date()
+        except (ValueError, AttributeError):
+            pass
+
+    return {
+        "external_id": raw["id"],
+        "name": raw.get("name"),
+        "status": raw.get("status"),
+        "objective": raw.get("objective"),
+        "budget_type": budget_type,
+        "budget_amount": budget_amount,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+async def sync_campaigns_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步單一帳戶的 campaigns
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+
+    AC-M1: 能從 Meta API 取得 campaigns 並存入 DB
+    """
+    try:
+        # 初始化 Meta API Client
+        client = MetaAPIClient(
+            access_token=account.access_token or "",
+            ad_account_id=account.external_id,
+        )
+
+        # 取得所有 campaigns（含分頁）
+        campaigns_data = await client.get_campaigns()
+        logger.info(f"Fetched {len(campaigns_data)} campaigns from Meta API")
+
+        synced_count = 0
+
+        for raw_campaign in campaigns_data:
+            parsed = _parse_campaign_data(raw_campaign)
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(Campaign).where(
+                    Campaign.account_id == account.id,
+                    Campaign.external_id == parsed["external_id"],
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # 更新現有記錄
+                for key, value in parsed.items():
+                    if key != "external_id" and value is not None:
+                        setattr(existing, key, value)
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                # 建立新記錄
+                campaign = Campaign(
+                    id=uuid.uuid4(),
+                    account_id=account.id,
+                    **parsed,
+                )
+                session.add(campaign)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(f"Synced {synced_count} campaigns for account {account.id}")
+
+        return {
+            "status": "completed",
+            "campaigns_synced": synced_count,
+        }
+
+    except TokenExpiredError:
+        logger.warning(f"Token expired for account {account.id}")
+        # 標記帳戶需要重新授權
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_expired")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "token_expired",
+            "account_id": str(account.id),
+        }
+
+    except RateLimitError as e:
+        logger.warning(f"Rate limited for account {account.id}, retry_after={e.retry_after}")
+        return {
+            "status": "error",
+            "error": "rate_limited",
+            "retry_after": e.retry_after,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to sync campaigns for account {account.id}: {e}")
+        raise SyncError(
+            account_id=str(account.id),
+            operation="sync_campaigns",
+            reason=str(e),
+        )
+
+
+def _parse_adset_data(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    解析 Meta API 回傳的 ad set 資料
+
+    Args:
+        raw: Meta API 回傳的原始資料
+
+    Returns:
+        轉換後的資料庫欄位格式
+    """
+    # 解析預算
+    budget_type = None
+    budget_amount = None
+
+    if "daily_budget" in raw and raw["daily_budget"]:
+        budget_type = "DAILY"
+        budget_amount = Decimal(raw["daily_budget"]) / 100
+    elif "lifetime_budget" in raw and raw["lifetime_budget"]:
+        budget_type = "LIFETIME"
+        budget_amount = Decimal(raw["lifetime_budget"]) / 100
+
+    return {
+        "external_id": raw["id"],
+        "name": raw.get("name"),
+        "status": raw.get("status"),
+        "campaign_external_id": raw.get("campaign_id"),
+        "targeting": raw.get("targeting"),
+        "budget_type": budget_type,
+        "budget_amount": budget_amount,
+        "bid_strategy": raw.get("bid_strategy"),
+    }
+
+
+async def sync_adsets_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步單一帳戶的 ad sets
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+
+    AC-M2: 能同步 ad sets 並關聯到正確的 campaign
+    """
+    try:
+        # 初始化 Meta API Client
+        client = MetaAPIClient(
+            access_token=account.access_token or "",
+            ad_account_id=account.external_id,
+        )
+
+        # 取得所有 ad sets
+        adsets_data = await client.get_adsets()
+        logger.info(f"Fetched {len(adsets_data)} ad sets from Meta API")
+
+        # 建立 campaign external_id -> id 的對應表
+        campaigns_result = await session.execute(
+            select(Campaign).where(Campaign.account_id == account.id)
+        )
+        campaigns = {c.external_id: c.id for c in campaigns_result.scalars().all()}
+
+        synced_count = 0
+        skipped_count = 0
+
+        for raw_adset in adsets_data:
+            parsed = _parse_adset_data(raw_adset)
+            campaign_external_id = parsed.pop("campaign_external_id")
+
+            # 找到對應的 campaign
+            campaign_id = campaigns.get(campaign_external_id)
+            if not campaign_id:
+                logger.warning(
+                    f"Campaign {campaign_external_id} not found for ad set {parsed['external_id']}"
+                )
+                skipped_count += 1
+                continue
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(AdSet).where(
+                    AdSet.campaign_id == campaign_id,
+                    AdSet.external_id == parsed["external_id"],
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # 更新現有記錄
+                for key, value in parsed.items():
+                    if key != "external_id" and value is not None:
+                        setattr(existing, key, value)
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                # 建立新記錄
+                adset = AdSet(
+                    id=uuid.uuid4(),
+                    campaign_id=campaign_id,
+                    **parsed,
+                )
+                session.add(adset)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(
+            f"Synced {synced_count} ad sets for account {account.id}, "
+            f"skipped {skipped_count}"
+        )
+
+        return {
+            "status": "completed",
+            "adsets_synced": synced_count,
+            "skipped": skipped_count,
+        }
+
+    except TokenExpiredError:
+        logger.warning(f"Token expired for account {account.id}")
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_expired")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "token_expired",
+            "account_id": str(account.id),
+        }
+
+    except RateLimitError as e:
+        logger.warning(f"Rate limited for account {account.id}")
+        return {
+            "status": "error",
+            "error": "rate_limited",
+            "retry_after": e.retry_after,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to sync ad sets for account {account.id}: {e}")
+        raise SyncError(
+            account_id=str(account.id),
+            operation="sync_adsets",
+            reason=str(e),
+        )
+
+
+def _parse_ad_data(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    解析 Meta API 回傳的 ad 資料
+
+    Args:
+        raw: Meta API 回傳的原始資料
+
+    Returns:
+        轉換後的資料庫欄位格式
+    """
+    creative_external_id = None
+    if "creative" in raw and raw["creative"]:
+        creative_external_id = raw["creative"].get("id")
+
+    return {
+        "external_id": raw["id"],
+        "name": raw.get("name"),
+        "status": raw.get("status"),
+        "adset_external_id": raw.get("adset_id"),
+        "creative_external_id": creative_external_id,
+    }
+
+
+async def sync_ads_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步單一帳戶的 ads
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+
+    AC-M3: 能同步 ads 並關聯到正確的 ad set
+    """
+    try:
+        client = MetaAPIClient(
+            access_token=account.access_token or "",
+            ad_account_id=account.external_id,
+        )
+
+        ads_data = await client.get_ads()
+        logger.info(f"Fetched {len(ads_data)} ads from Meta API")
+
+        # 建立 adset external_id -> id 的對應表
+        # 需要先取得所有 campaigns，再取得對應的 adsets
+        campaigns_result = await session.execute(
+            select(Campaign).where(Campaign.account_id == account.id)
+        )
+        campaign_ids = [c.id for c in campaigns_result.scalars().all()]
+
+        adsets_result = await session.execute(
+            select(AdSet).where(AdSet.campaign_id.in_(campaign_ids))
+        )
+        adsets = {a.external_id: a.id for a in adsets_result.scalars().all()}
+
+        synced_count = 0
+        skipped_count = 0
+
+        for raw_ad in ads_data:
+            parsed = _parse_ad_data(raw_ad)
+            adset_external_id = parsed.pop("adset_external_id")
+            creative_external_id = parsed.pop("creative_external_id")
+
+            # 找到對應的 ad set
+            adset_id = adsets.get(adset_external_id)
+            if not adset_id:
+                logger.warning(
+                    f"Ad set {adset_external_id} not found for ad {parsed['external_id']}"
+                )
+                skipped_count += 1
+                continue
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(Ad).where(
+                    Ad.ad_set_id == adset_id,
+                    Ad.external_id == parsed["external_id"],
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                for key, value in parsed.items():
+                    if key != "external_id" and value is not None:
+                        setattr(existing, key, value)
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                ad = Ad(
+                    id=uuid.uuid4(),
+                    ad_set_id=adset_id,
+                    **parsed,
+                )
+                session.add(ad)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(
+            f"Synced {synced_count} ads for account {account.id}, "
+            f"skipped {skipped_count}"
+        )
+
+        return {
+            "status": "completed",
+            "ads_synced": synced_count,
+            "skipped": skipped_count,
+        }
+
+    except TokenExpiredError:
+        logger.warning(f"Token expired for account {account.id}")
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_expired")
+        )
+        await session.commit()
+        return {"status": "error", "error": "token_expired"}
+
+    except RateLimitError as e:
+        return {"status": "error", "error": "rate_limited", "retry_after": e.retry_after}
+
+    except Exception as e:
+        logger.error(f"Failed to sync ads for account {account.id}: {e}")
+        raise SyncError(
+            account_id=str(account.id),
+            operation="sync_ads",
+            reason=str(e),
+        )
 
 
 @celery_app.task(name="app.workers.sync_meta.sync_audiences")
@@ -216,15 +670,220 @@ def sync_audiences(account_id: str):
     return {"status": "completed", "audiences_synced": 0}
 
 
+def calculate_ctr(clicks: int, impressions: int) -> Decimal:
+    """
+    計算 CTR (Click-Through Rate)
+
+    Args:
+        clicks: 點擊數
+        impressions: 曝光數
+
+    Returns:
+        CTR 百分比（例如 5.0 表示 5%）
+    """
+    if impressions == 0:
+        return Decimal("0")
+    return (Decimal(clicks) / Decimal(impressions) * 100).quantize(Decimal("0.000001"))
+
+
+def calculate_cpc(spend: Decimal, clicks: int) -> Decimal:
+    """
+    計算 CPC (Cost Per Click)
+
+    Args:
+        spend: 花費
+        clicks: 點擊數
+
+    Returns:
+        每次點擊成本
+    """
+    if clicks == 0:
+        return Decimal("0")
+    return (spend / Decimal(clicks)).quantize(Decimal("0.01"))
+
+
+def calculate_roas(conversion_value: Decimal, spend: Decimal) -> Decimal:
+    """
+    計算 ROAS (Return on Ad Spend)
+
+    Args:
+        conversion_value: 轉換價值
+        spend: 花費
+
+    Returns:
+        廣告投資報酬率
+    """
+    if spend == 0:
+        return Decimal("0")
+    return (conversion_value / spend).quantize(Decimal("0.01"))
+
+
+async def sync_metrics_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+    date_preset: str = "last_7d",
+) -> dict[str, Any]:
+    """
+    同步單一帳戶的 metrics
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+        date_preset: 日期範圍
+
+    Returns:
+        同步結果
+
+    AC-M4: 能取得 insights 並計算 CTR、CPC、ROAS
+    """
+    try:
+        client = MetaAPIClient(
+            access_token=account.access_token or "",
+            ad_account_id=account.external_id,
+        )
+
+        insights_data = await client.get_insights(
+            date_preset=date_preset,
+            level="ad",
+        )
+        logger.info(f"Fetched {len(insights_data)} insight records from Meta API")
+
+        # 建立 creative external_id -> id 的對應表
+        creatives_result = await session.execute(
+            select(Creative).where(Creative.account_id == account.id)
+        )
+        creatives = {c.external_id: c.id for c in creatives_result.scalars().all()}
+
+        synced_count = 0
+        skipped_count = 0
+
+        for insight in insights_data:
+            creative_external_id = insight.get("creative_id")
+            if not creative_external_id:
+                skipped_count += 1
+                continue
+
+            creative_id = creatives.get(creative_external_id)
+            if not creative_id:
+                logger.debug(
+                    f"Creative {creative_external_id} not found, skipping metrics"
+                )
+                skipped_count += 1
+                continue
+
+            # 解析日期
+            date_str = insight.get("date_start", insight.get("date_stop"))
+            if not date_str:
+                skipped_count += 1
+                continue
+
+            try:
+                metric_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                skipped_count += 1
+                continue
+
+            # 解析指標
+            impressions = int(insight.get("impressions", 0))
+            clicks = int(insight.get("clicks", 0))
+            spend = Decimal(insight.get("spend", "0"))
+            conversions = int(insight.get("conversions", 0))
+            frequency = Decimal(insight.get("frequency", "0")) if insight.get("frequency") else None
+
+            # 計算衍生指標
+            ctr = calculate_ctr(clicks, impressions)
+            conversion_rate = calculate_ctr(conversions, clicks) if clicks > 0 else Decimal("0")
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(CreativeMetrics).where(
+                    CreativeMetrics.creative_id == creative_id,
+                    CreativeMetrics.date == metric_date,
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                existing.impressions = impressions
+                existing.clicks = clicks
+                existing.ctr = ctr
+                existing.conversions = conversions
+                existing.conversion_rate = conversion_rate
+                existing.spend = spend
+                existing.frequency = frequency
+            else:
+                metrics = CreativeMetrics(
+                    id=uuid.uuid4(),
+                    creative_id=creative_id,
+                    date=metric_date,
+                    impressions=impressions,
+                    clicks=clicks,
+                    ctr=ctr,
+                    conversions=conversions,
+                    conversion_rate=conversion_rate,
+                    spend=spend,
+                    frequency=frequency,
+                )
+                session.add(metrics)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(
+            f"Synced {synced_count} metrics for account {account.id}, "
+            f"skipped {skipped_count}"
+        )
+
+        return {
+            "status": "completed",
+            "metrics_synced": synced_count,
+            "skipped": skipped_count,
+        }
+
+    except TokenExpiredError:
+        logger.warning(f"Token expired for account {account.id}")
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_expired")
+        )
+        await session.commit()
+        return {"status": "error", "error": "token_expired"}
+
+    except RateLimitError as e:
+        return {"status": "error", "error": "rate_limited", "retry_after": e.retry_after}
+
+    except Exception as e:
+        logger.error(f"Failed to sync metrics for account {account.id}: {e}")
+        raise SyncError(
+            account_id=str(account.id),
+            operation="sync_metrics",
+            reason=str(e),
+        )
+
+
 @celery_app.task(name="app.workers.sync_meta.sync_metrics")
 def sync_metrics(account_id: str, date_range: str = "last_7d"):
     """
-    同步帳戶的指標數據
+    同步帳戶的指標數據（Celery Task）
 
     Args:
         account_id: 帳戶 UUID
         date_range: 日期範圍，預設最近 7 天
     """
     logger.info(f"Syncing metrics for account: {account_id}, range: {date_range}")
-    # TODO: 實作 metrics 同步
-    return {"status": "completed", "metrics_synced": 0}
+    return asyncio.run(_sync_metrics_task(account_id, date_range))
+
+
+async def _sync_metrics_task(account_id: str, date_range: str) -> dict[str, Any]:
+    """執行 metrics 同步的異步任務"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
+        )
+        account = result.scalar_one_or_none()
+
+        if not account:
+            return {"status": "error", "error": "Account not found"}
+
+        return await sync_metrics_for_account(session, account, date_range)

@@ -7,10 +7,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.exceptions import AdOptimizeError
+from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.routers import api_router
 
 settings = get_settings()
@@ -20,6 +23,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """應用程式生命週期管理"""
     # 啟動時執行
+    setup_logging(level=settings.LOG_LEVEL)
     print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     yield
     # 關閉時執行
@@ -44,6 +48,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 日誌中間件（AC-A3: trace_id 追蹤）
+app.add_middleware(LoggingMiddleware)
+
+
+# 全局異常處理（AC-E4: 統一錯誤格式）
+@app.exception_handler(AdOptimizeError)
+async def adoptimize_error_handler(request: Request, exc: AdOptimizeError) -> JSONResponse:
+    """處理自定義異常，返回統一格式"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_response(),
+        headers={"X-Trace-ID": request.headers.get("X-Trace-ID", "")},
+    )
 
 
 @app.get("/api/health")

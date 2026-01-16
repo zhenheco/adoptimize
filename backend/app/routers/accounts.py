@@ -74,30 +74,6 @@ def _convert_db_account_to_response(account: AdAccount) -> AccountResponse:
     )
 
 
-def _generate_mock_accounts() -> list[AccountResponse]:
-    """產生模擬帳戶資料"""
-    return [
-        AccountResponse(
-            id=str(uuid.uuid4()),
-            platform="google",
-            external_id="123-456-7890",
-            name="Google Ads 主帳戶",
-            status="active",
-            last_sync_at=datetime.now(timezone.utc).isoformat(),
-            created_at=datetime.now(timezone.utc).isoformat(),
-        ),
-        AccountResponse(
-            id=str(uuid.uuid4()),
-            platform="meta",
-            external_id="act_9876543210",
-            name="Meta 廣告帳戶",
-            status="active",
-            last_sync_at=datetime.now(timezone.utc).isoformat(),
-            created_at=datetime.now(timezone.utc).isoformat(),
-        ),
-    ]
-
-
 @router.get("", response_model=AccountListResponse)
 async def get_accounts(
     platform: Optional[str] = Query(None, description="平台: google, meta"),
@@ -134,22 +110,7 @@ async def get_accounts(
     result = await db.execute(query)
     account_records = result.scalars().all()
 
-    # 如果資料庫無資料，返回模擬數據
-    if not account_records:
-        mock_accounts = _generate_mock_accounts()
-        # 套用篩選
-        if platform:
-            mock_accounts = [a for a in mock_accounts if a.platform == platform.lower()]
-        if status:
-            mock_accounts = [a for a in mock_accounts if a.status == status.lower()]
-
-        return AccountListResponse(
-            data=mock_accounts,
-            meta={
-                "total": len(mock_accounts),
-            },
-        )
-
+    # 返回真實資料（空陣列如果無資料）
     accounts = [_convert_db_account_to_response(a) for a in account_records]
 
     return AccountListResponse(

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
 
     # 資料庫設定
     # Supabase 格式: postgresql+asyncpg://postgres:[password]@db.[project-ref].supabase.co:5432/postgres

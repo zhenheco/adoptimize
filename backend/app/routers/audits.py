@@ -11,10 +11,17 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.db.base import get_db
+from app.models.health_audit import HealthAudit
+from app.models.audit_issue import AuditIssue
 from app.workers.run_health_audit import run_health_audit, run_full_audit
 
 router = APIRouter()
@@ -128,7 +135,10 @@ async def trigger_audit(request: TriggerAuditRequest) -> TriggerAuditResponse:
 
 
 @router.get("/{audit_id}", response_model=AuditDetailResponse)
-async def get_audit(audit_id: str) -> AuditDetailResponse:
+async def get_audit(
+    audit_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AuditDetailResponse:
     """
     取得健檢報告
 
@@ -140,16 +150,68 @@ async def get_audit(audit_id: str) -> AuditDetailResponse:
     Returns:
         AuditDetailResponse: 健檢報告詳情
     """
-    # TODO: 從資料庫取得健檢報告
-    # async with get_db_session() as db:
-    #     audit = await db.get(HealthAudit, audit_id)
-    #     if not audit:
-    #         raise HTTPException(status_code=404, detail="Audit not found")
+    try:
+        audit_uuid = UUID(audit_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid audit ID format")
 
-    # 模擬返回資料
-    raise HTTPException(
-        status_code=404,
-        detail="Audit not found",
+    # AC-A1: 從資料庫取得健檢報告（真實資料，非 mock）
+    result = await db.execute(
+        select(HealthAudit)
+        .options(selectinload(HealthAudit.issues))
+        .where(HealthAudit.id == audit_uuid)
+    )
+    audit = result.scalar_one_or_none()
+
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+
+    # 轉換為回應格式
+    return AuditDetailResponse(
+        id=str(audit.id),
+        account_id=str(audit.account_id),
+        overall_score=audit.overall_score or 0,
+        dimensions={
+            "structure": AuditDimension(
+                score=audit.structure_score or 0,
+                weight=0.2,
+                issues_count=sum(1 for i in audit.issues if i.category == "STRUCTURE"),
+            ),
+            "creative": AuditDimension(
+                score=audit.creative_score or 0,
+                weight=0.25,
+                issues_count=sum(1 for i in audit.issues if i.category == "CREATIVE"),
+            ),
+            "audience": AuditDimension(
+                score=audit.audience_score or 0,
+                weight=0.2,
+                issues_count=sum(1 for i in audit.issues if i.category == "AUDIENCE"),
+            ),
+            "budget": AuditDimension(
+                score=audit.budget_score or 0,
+                weight=0.15,
+                issues_count=sum(1 for i in audit.issues if i.category == "BUDGET"),
+            ),
+            "tracking": AuditDimension(
+                score=audit.tracking_score or 0,
+                weight=0.2,
+                issues_count=sum(1 for i in audit.issues if i.category == "TRACKING"),
+            ),
+        },
+        issues=[
+            AuditIssueResponse(
+                id=str(issue.id),
+                code=issue.issue_code or "",
+                category=issue.category or "",
+                severity=issue.severity or "",
+                title=issue.title or "",
+                description=issue.description or "",
+                impact_description=issue.impact_description or "",
+                solution=issue.solution or "",
+            )
+            for issue in audit.issues
+        ],
+        created_at=audit.created_at.isoformat() if audit.created_at else "",
     )
 
 
@@ -158,6 +220,7 @@ async def get_audit_issues(
     audit_id: str,
     category: Optional[str] = Query(None, description="篩選問題類別"),
     severity: Optional[str] = Query(None, description="篩選嚴重程度"),
+    db: AsyncSession = Depends(get_db),
 ) -> list[AuditIssueResponse]:
     """
     取得健檢問題清單
@@ -170,23 +233,41 @@ async def get_audit_issues(
     Returns:
         問題清單
     """
-    # TODO: 從資料庫取得問題清單
-    # async with get_db_session() as db:
-    #     query = select(AuditIssue).where(AuditIssue.audit_id == audit_id)
-    #     if category:
-    #         query = query.where(AuditIssue.category == category)
-    #     if severity:
-    #         query = query.where(AuditIssue.severity == severity)
-    #     issues = await db.scalars(query)
+    try:
+        audit_uuid = UUID(audit_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid audit ID format")
 
-    raise HTTPException(
-        status_code=404,
-        detail="Audit not found",
-    )
+    # AC-A1: 從資料庫取得問題清單（真實資料，非 mock）
+    query = select(AuditIssue).where(AuditIssue.audit_id == audit_uuid)
+    if category:
+        query = query.where(AuditIssue.category == category)
+    if severity:
+        query = query.where(AuditIssue.severity == severity)
+
+    result = await db.execute(query)
+    issues = result.scalars().all()
+
+    return [
+        AuditIssueResponse(
+            id=str(issue.id),
+            code=issue.issue_code or "",
+            category=issue.category or "",
+            severity=issue.severity or "",
+            title=issue.title or "",
+            description=issue.description or "",
+            impact_description=issue.impact_description or "",
+            solution=issue.solution or "",
+        )
+        for issue in issues
+    ]
 
 
 @router.get("/account/{account_id}", response_model=AuditResponse)
-async def get_latest_audit(account_id: str) -> AuditResponse:
+async def get_latest_audit(
+    account_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AuditResponse:
     """
     取得帳戶最新的健檢報告
 
@@ -196,23 +277,38 @@ async def get_latest_audit(account_id: str) -> AuditResponse:
     Returns:
         AuditResponse: 最新的健檢報告
     """
-    # TODO: 從資料庫取得最新健檢報告
-    # async with get_db_session() as db:
-    #     audit = await db.scalar(
-    #         select(HealthAudit)
-    #         .where(HealthAudit.account_id == account_id)
-    #         .order_by(HealthAudit.created_at.desc())
-    #         .limit(1)
-    #     )
+    try:
+        account_uuid = UUID(account_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid account ID format")
 
-    raise HTTPException(
-        status_code=404,
-        detail="No audit found for this account",
+    # AC-A1: 從資料庫取得最新健檢報告（真實資料，非 mock）
+    result = await db.execute(
+        select(HealthAudit)
+        .where(HealthAudit.account_id == account_uuid)
+        .order_by(HealthAudit.created_at.desc())
+        .limit(1)
+    )
+    audit = result.scalar_one_or_none()
+
+    if not audit:
+        raise HTTPException(status_code=404, detail="No audit found for this account")
+
+    return AuditResponse(
+        id=str(audit.id),
+        account_id=str(audit.account_id),
+        overall_score=audit.overall_score or 0,
+        issues_count=audit.issues_count,
+        created_at=audit.created_at.isoformat() if audit.created_at else "",
     )
 
 
 @router.post("/{audit_id}/issues/{issue_id}/resolve")
-async def resolve_issue(audit_id: str, issue_id: str) -> dict:
+async def resolve_issue(
+    audit_id: str,
+    issue_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     """
     標記問題為已解決
 
@@ -223,8 +319,31 @@ async def resolve_issue(audit_id: str, issue_id: str) -> dict:
     Returns:
         成功訊息
     """
-    # TODO: 更新資料庫中的問題狀態
-    raise HTTPException(
-        status_code=404,
-        detail="Issue not found",
+    try:
+        audit_uuid = UUID(audit_id)
+        issue_uuid = UUID(issue_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    # 從資料庫取得問題
+    result = await db.execute(
+        select(AuditIssue).where(
+            AuditIssue.id == issue_uuid,
+            AuditIssue.audit_id == audit_uuid,
+        )
     )
+    issue = result.scalar_one_or_none()
+
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    # 更新問題狀態
+    issue.status = "resolved"
+    issue.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": "Issue marked as resolved",
+        "issue_id": str(issue.id),
+    }
