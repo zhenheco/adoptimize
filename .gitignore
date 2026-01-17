@@ -84,3 +84,4 @@ google-ads.yaml
 coverage/
 test-results/
 .vercel
+tsconfig.tsbuildinfo
