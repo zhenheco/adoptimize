@@ -145,7 +145,7 @@ export default function RegisterPage() {
         <div>
           <CardTitle className="text-2xl font-bold">建立帳號</CardTitle>
           <CardDescription className="text-base mt-2">
-            開始使用 AdOptimize 優化您的廣告
+            開始使用廣告船長優化您的廣告
           </CardDescription>
         </div>
       </CardHeader>

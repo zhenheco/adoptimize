@@ -13,10 +13,10 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     target: 'body',
     content:
-      '歡迎使用 AdOptimize！讓我們花 1 分鐘帶您了解如何使用這個工具來優化您的廣告效能。',
+      '歡迎使用 廣告船長！讓我們花 1 分鐘帶您了解如何使用這個工具來優化您的廣告效能。',
     placement: 'center',
     disableBeacon: true,
-    title: '歡迎使用 AdOptimize',
+    title: '歡迎使用 廣告船長',
   },
 
   // Step 2: 側邊欄導航總覽

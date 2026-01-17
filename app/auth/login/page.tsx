@@ -99,7 +99,7 @@ export default function LoginPage() {
 
         <div>
           <CardTitle className="text-2xl font-bold">
-            歡迎使用 AdOptimize
+            歡迎使用廣告船長
           </CardTitle>
           <CardDescription className="text-base mt-2">
             跨平台廣告優化工具

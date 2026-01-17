@@ -412,7 +412,7 @@ function AccountsContent() {
                 尚未連結任何帳戶
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4">
-                連結您的廣告帳戶以開始使用 AdOptimize
+                連結您的廣告帳戶以開始使用 廣告船長
               </p>
             </CardContent>
           </Card>

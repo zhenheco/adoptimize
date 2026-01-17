@@ -3,7 +3,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AdOptimize - 跨平台廣告優化工具',
+  title: '廣告船長 - 跨平台廣告優化工具',
   description: '整合 Google Ads 和 Meta Marketing API 的智慧廣告優化平台',
 };
 

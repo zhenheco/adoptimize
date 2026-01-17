@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import {
@@ -14,6 +14,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  Ship,
 } from 'lucide-react';
 import { RestartTourButton } from '@/components/onboarding';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
  */
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
 
   /**
@@ -63,6 +65,17 @@ export function Sidebar() {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
+  /**
+   * 登出功能
+   */
+  const handleLogout = () => {
+    // 清除 localStorage 中的 token
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    // 導向登入頁面
+    router.push('/auth/login');
+  };
+
   return (
     <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo 區域 */}
@@ -70,10 +83,10 @@ export function Sidebar() {
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">AO</span>
+              <Ship className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">
-              AdOptimize
+              廣告船長
             </span>
           </Link>
           <Button
@@ -124,7 +137,10 @@ export function Sidebar() {
           <Settings className="w-5 h-5" />
           設定
         </Link>
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+        >
           <LogOut className="w-5 h-5" />
           登出
         </button>
