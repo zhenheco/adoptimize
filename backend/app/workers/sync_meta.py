@@ -14,9 +14,9 @@ Meta Marketing API 數據同步 Worker
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -750,7 +750,7 @@ async def sync_metrics_for_account(
 
         # 建立 creative external_id -> id 的對應表
         creatives_result = await session.execute(
-            select(Creative).where(Creative.account_id == account.id)
+            select(Creative).where(Creative.ad_account_id == account.id)
         )
         creatives = {c.external_id: c.id for c in creatives_result.scalars().all()}
 

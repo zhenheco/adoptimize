@@ -172,10 +172,10 @@ class TestFullSyncFlow:
         # 先建立 Creative
         creative = Creative(
             id=uuid.uuid4(),
-            account_id=test_ad_account.id,
+            ad_account_id=test_ad_account.id,
             external_id="creative_001",
             type="IMAGE",
-            headline="Test Creative",
+            name="Test Creative",
         )
         db_session.add(creative)
         await db_session.commit()

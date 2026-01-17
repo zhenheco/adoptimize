@@ -29,35 +29,56 @@ class Creative(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    account_id: Mapped[uuid.UUID] = mapped_column(
+    ad_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ad_accounts.id", ondelete="CASCADE"),
         nullable=False,
+        name="ad_account_id",
     )
     external_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         index=True,
     )
+    name: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
     type: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
         comment="類型: IMAGE, VIDEO, CAROUSEL, etc.",
     )
-    headline: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    video_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     thumbnail_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cta: Mapped[str | None] = mapped_column(
-        String(100),
+    status: Mapped[str | None] = mapped_column(
+        String(50),
         nullable=True,
-        comment="CTA: LEARN_MORE, SHOP_NOW, etc.",
+        comment="狀態: ACTIVE, PAUSED, etc.",
+    )
+    first_served_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        onupdate=func.now(),
+    )
+
+    # 向後相容性別名
+    @property
+    def account_id(self) -> uuid.UUID:
+        """向後相容：使用 ad_account_id"""
+        return self.ad_account_id
+
+    @property
+    def headline(self) -> str | None:
+        """向後相容：使用 name 作為 headline"""
+        return self.name
 
     # 關聯
     account: Mapped["AdAccount"] = relationship("AdAccount", back_populates="creatives")

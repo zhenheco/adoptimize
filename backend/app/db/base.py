@@ -11,12 +11,18 @@ from app.core.config import get_settings
 settings = get_settings()
 
 # 建立非同步引擎
+# 注意：Supabase 使用 pgbouncer（transaction mode），需要禁用 prepared statement cache
+# 否則會出現「prepared statement does not exist」錯誤
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 # 建立非同步 Session 工廠

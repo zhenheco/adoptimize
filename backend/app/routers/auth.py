@@ -8,12 +8,14 @@
 
 from datetime import date
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.security import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
@@ -225,7 +227,6 @@ async def login(
     access_token = create_access_token(subject=str(user.id))
     refresh_token = create_refresh_token(subject=str(user.id))
 
-    from app.core.config import get_settings
     settings = get_settings()
 
     return {
@@ -285,7 +286,6 @@ async def refresh_token(
         )
 
     # 確認用戶存在且啟用
-    from uuid import UUID
     stmt = select(User).where(User.id == UUID(user_id))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -302,7 +302,6 @@ async def refresh_token(
     # 生成新的 access token
     new_access_token = create_access_token(subject=str(user.id))
 
-    from app.core.config import get_settings
     settings = get_settings()
 
     return {
@@ -335,7 +334,7 @@ async def get_current_user(
         "id": str(current_user.id),
         "email": current_user.email,
         "name": current_user.name,
-        "company": current_user.company,
+        "company": current_user.company_name,
         "is_active": current_user.is_active,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
     }
