@@ -33,28 +33,6 @@ interface AdAccount {
   lastSync: string;
 }
 
-/**
- * 模擬已連結帳戶資料
- * TODO: 從 API 獲取實際資料
- */
-const mockAccounts: AdAccount[] = [
-  {
-    id: '1',
-    platform: 'google',
-    name: 'Google Ads - 主帳戶',
-    accountId: '123-456-7890',
-    status: 'connected',
-    lastSync: '2024-12-31T10:30:00Z',
-  },
-  {
-    id: '2',
-    platform: 'meta',
-    name: 'Meta Business - 電商廣告',
-    accountId: 'act_1234567890',
-    status: 'connected',
-    lastSync: '2024-12-31T09:15:00Z',
-  },
-];
 
 /**
  * 帳戶卡片元件
@@ -186,11 +164,49 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
  */
 function AccountsContent() {
   const searchParams = useSearchParams();
-  const [accounts, setAccounts] = useState<AdAccount[]>(mockAccounts);
+  const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  // 從 API 獲取帳戶列表
+  useEffect(() => {
+    async function fetchAccounts() {
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('/api/v1/accounts', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (response.ok) {
+          const result = await response.json();
+          // 轉換 API 格式為前端格式
+          const apiAccounts = (result.data || []).map((acc: {
+            id: string;
+            platform: string;
+            name: string;
+            external_id: string;
+            status: string;
+            last_synced_at: string;
+          }) => ({
+            id: acc.id,
+            platform: acc.platform as 'google' | 'meta',
+            name: acc.name,
+            accountId: acc.external_id,
+            status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
+            lastSync: acc.last_synced_at || new Date().toISOString(),
+          }));
+          setAccounts(apiAccounts);
+        }
+      } catch (error) {
+        console.error('Failed to fetch accounts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchAccounts();
+  }, []);
 
   // 處理 OAuth callback query params
   useEffect(() => {
@@ -221,15 +237,57 @@ function AccountsContent() {
   /**
    * 連結 Google Ads 帳戶
    */
-  const handleConnectGoogle = () => {
-    window.location.href = '/api/v1/accounts/connect/google';
+  const handleConnectGoogle = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/google', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
+      } else {
+        const error = await response.json();
+        setToast({ type: 'error', message: error.error || '無法取得授權連結' });
+      }
+    } catch (error) {
+      console.error('Connect Google error:', error);
+      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+    }
   };
 
   /**
    * 連結 Meta 帳戶
    */
-  const handleConnectMeta = () => {
-    window.location.href = '/api/v1/accounts/connect/meta';
+  const handleConnectMeta = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/meta', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
+      } else {
+        const error = await response.json();
+        setToast({ type: 'error', message: error.error || '無法取得授權連結' });
+      }
+    } catch (error) {
+      console.error('Connect Meta error:', error);
+      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+    }
   };
 
   /**

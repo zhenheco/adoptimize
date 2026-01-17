@@ -167,61 +167,19 @@ async def get_dashboard_overview(
     result = await db.execute(query)
     platform_data = result.all()
 
-    # 如果資料庫無資料，返回模擬數據
+    # 如果資料庫無資料，返回空數據（不再返回模擬數據）
     if not platform_data:
-        multiplier = 1 if period == "today" else 7 if period == "7d" else 30
-
-        google_spend = 800.00 * multiplier
-        google_conversions = 70 * multiplier
-        meta_spend = 700.00 * multiplier
-        meta_conversions = 55 * multiplier
-
-        total_spend = google_spend + meta_spend
-        total_impressions = 50000 * multiplier
-        total_clicks = 2500 * multiplier
-        total_conversions = google_conversions + meta_conversions
-
-        cpa = total_spend / total_conversions if total_conversions > 0 else 0
-        roas = (total_conversions * 50) / total_spend if total_spend > 0 else 0
-
         return DashboardOverviewResponse(
             period=Period(start=start_date, end=end_date),
             metrics=DashboardMetrics(
-                spend=MetricValue(
-                    value=total_spend,
-                    change=-5.2,
-                    status=_get_metric_status(-5.2, is_positive_better=False),
-                ),
-                impressions=MetricValue(
-                    value=total_impressions,
-                    change=12.3,
-                    status=_get_metric_status(12.3),
-                ),
-                clicks=MetricValue(
-                    value=total_clicks,
-                    change=8.1,
-                    status=_get_metric_status(8.1),
-                ),
-                conversions=MetricValue(
-                    value=total_conversions,
-                    change=-2.5,
-                    status=_get_metric_status(-2.5),
-                ),
-                cpa=MetricValue(
-                    value=round(cpa, 2),
-                    change=15.3,
-                    status=_get_metric_status(15.3, is_positive_better=False),
-                ),
-                roas=MetricValue(
-                    value=round(roas, 2),
-                    change=-8.2,
-                    status=_get_metric_status(-8.2),
-                ),
+                spend=MetricValue(value=0, change=0, status="normal"),
+                impressions=MetricValue(value=0, change=0, status="normal"),
+                clicks=MetricValue(value=0, change=0, status="normal"),
+                conversions=MetricValue(value=0, change=0, status="normal"),
+                cpa=MetricValue(value=0, change=0, status="normal"),
+                roas=MetricValue(value=0, change=0, status="normal"),
             ),
-            platforms={
-                "google": PlatformMetrics(spend=google_spend, conversions=google_conversions),
-                "meta": PlatformMetrics(spend=meta_spend, conversions=meta_conversions),
-            },
+            platforms={},
         )
 
     # 彙總平台數據
@@ -417,59 +375,17 @@ async def get_dashboard_metrics(
     result = await db.execute(query)
     daily_data = result.all()
 
-    # 如果無資料，返回模擬數據
+    # 如果無資料，返回空數據
     if not daily_data:
-        multiplier = 1 if period == "today" else 7 if period == "7d" else 30
-        base_impressions = 50000
-        base_clicks = 2500
-        base_conversions = 125
-        base_spend = 1500.0
-
         return DetailedMetricsResponse(
             period=Period(start=start_date, end=end_date),
             metrics=[
-                DetailedMetric(
-                    name="impressions",
-                    value=base_impressions * multiplier,
-                    change=12.3,
-                    status="normal",
-                    trend=[45000, 48000, 52000, 49000, 51000, 53000, 50000],
-                ),
-                DetailedMetric(
-                    name="clicks",
-                    value=base_clicks * multiplier,
-                    change=8.1,
-                    status="normal",
-                    trend=[2200, 2400, 2600, 2500, 2700, 2800, 2500],
-                ),
-                DetailedMetric(
-                    name="conversions",
-                    value=base_conversions * multiplier,
-                    change=-2.5,
-                    status="warning",
-                    trend=[120, 130, 125, 110, 115, 128, 125],
-                ),
-                DetailedMetric(
-                    name="spend",
-                    value=base_spend * multiplier,
-                    change=-5.2,
-                    status="normal",
-                    trend=[1400, 1500, 1600, 1450, 1550, 1480, 1500],
-                ),
-                DetailedMetric(
-                    name="cpa",
-                    value=12.0,
-                    change=15.3,
-                    status="warning",
-                    trend=[11.67, 11.54, 12.80, 13.18, 13.48, 11.56, 12.00],
-                ),
-                DetailedMetric(
-                    name="roas",
-                    value=4.17,
-                    change=-8.2,
-                    status="normal",
-                    trend=[4.29, 4.33, 3.91, 3.79, 3.71, 4.32, 4.17],
-                ),
+                DetailedMetric(name="impressions", value=0, change=0, status="normal", trend=[]),
+                DetailedMetric(name="clicks", value=0, change=0, status="normal", trend=[]),
+                DetailedMetric(name="conversions", value=0, change=0, status="normal", trend=[]),
+                DetailedMetric(name="spend", value=0, change=0, status="normal", trend=[]),
+                DetailedMetric(name="cpa", value=0, change=0, status="normal", trend=[]),
+                DetailedMetric(name="roas", value=0, change=0, status="normal", trend=[]),
             ],
         )
 
@@ -594,36 +510,11 @@ async def get_dashboard_trends(
     result = await db.execute(query)
     daily_data = result.all()
 
-    # 如果無資料，返回模擬數據
+    # 如果無資料，返回空數據
     if not daily_data:
-        days = 7 if period == "7d" else 30
-        mock_data = []
-        today = datetime.now().date()
-
-        for i in range(days):
-            day = today - timedelta(days=days - 1 - i)
-            impressions = 50000 + (i * 1000) - (i % 3 * 500)
-            clicks = 2500 + (i * 50) - (i % 3 * 25)
-            conversions = 125 + (i * 2) - (i % 3)
-            spend = 1500.0 + (i * 20) - (i % 3 * 10)
-            cpa = spend / conversions if conversions > 0 else 0
-            roas = (conversions * 50) / spend if spend > 0 else 0
-
-            mock_data.append(
-                TrendDataPoint(
-                    date=day.isoformat(),
-                    impressions=impressions,
-                    clicks=clicks,
-                    conversions=conversions,
-                    spend=round(spend, 2),
-                    cpa=round(cpa, 2),
-                    roas=round(roas, 2),
-                )
-            )
-
         return TrendsResponse(
             period=Period(start=start_date, end=end_date),
-            data=mock_data,
+            data=[],
             granularity=granularity,
         )
 
