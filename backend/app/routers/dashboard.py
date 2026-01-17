@@ -154,7 +154,7 @@ async def get_dashboard_overview(
             func.sum(CreativeMetrics.spend).label("spend"),
         )
         .join(Creative, CreativeMetrics.creative_id == Creative.id)
-        .join(AdAccount, Creative.account_id == AdAccount.id)
+        .join(AdAccount, Creative.ad_account_id == AdAccount.id)
         .where(CreativeMetrics.date >= start_date_obj)
         .where(CreativeMetrics.date <= end_date_obj)
         .group_by(AdAccount.platform)
@@ -369,7 +369,7 @@ async def get_dashboard_metrics(
     )
 
     if account_id_list:
-        query = query.join(AdAccount, Creative.account_id == AdAccount.id)
+        query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
         query = query.where(AdAccount.id.in_(account_id_list))
 
     result = await db.execute(query)
@@ -504,7 +504,7 @@ async def get_dashboard_trends(
     )
 
     if account_id_list:
-        query = query.join(AdAccount, Creative.account_id == AdAccount.id)
+        query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
         query = query.where(AdAccount.id.in_(account_id_list))
 
     result = await db.execute(query)
