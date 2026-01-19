@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { RestartTourButton } from '@/components/onboarding';
 import { Button } from '@/components/ui/button';
+import { useUser } from '@/hooks/use-user';
 
 /**
  * 導航項目介面
@@ -47,6 +48,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { userEmail, clearUser } = useUser();
 
   /**
    * 判斷導航項目是否為當前頁面
@@ -69,9 +71,10 @@ export function Sidebar() {
    * 登出功能
    */
   const handleLogout = () => {
-    // 清除 localStorage 中的 token
+    // 清除 localStorage 中的 token 和 user
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    clearUser();
     // 導向登入頁面
     router.push('/auth/login');
   };
@@ -145,6 +148,15 @@ export function Sidebar() {
           登出
         </button>
       </div>
+
+      {/* 用戶資訊 */}
+      {userEmail && (
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={userEmail}>
+            {userEmail}
+          </p>
+        </div>
+      )}
     </aside>
   );
 }

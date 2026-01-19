@@ -67,14 +67,14 @@ export function useOnboarding(): UseOnboardingReturn {
 
   /**
    * 重置並重新開始導覽
+   * 刷新頁面以確保所有組件狀態重置
    */
   const resetTour = useCallback(() => {
     resetOnboarding();
-    setStepIndex(0);
-    // 短暫延遲後開始，確保 DOM 準備好
-    setTimeout(() => {
-      setRun(true);
-    }, 100);
+    // 刷新頁面以重新觸發導覽
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   }, []);
 
   return {

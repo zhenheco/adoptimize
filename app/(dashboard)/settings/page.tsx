@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -15,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RestartTourButton } from '@/components/onboarding';
+import { useAccounts } from '@/hooks/use-accounts';
 import {
   Link2,
   Bell,
@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Check,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 /**
@@ -82,27 +83,6 @@ function SettingItem({ label, description, checked, onCheckedChange }: SettingIt
 }
 
 /**
- * 模擬已連結帳戶資料
- * TODO: 從 API 獲取實際資料
- */
-const mockAccounts = [
-  {
-    id: '1',
-    platform: 'google',
-    name: 'Google Ads - 主帳戶',
-    status: 'connected' as const,
-    lastSync: '2024-12-31T10:30:00Z',
-  },
-  {
-    id: '2',
-    platform: 'meta',
-    name: 'Meta Business - 電商廣告',
-    status: 'connected' as const,
-    lastSync: '2024-12-31T09:15:00Z',
-  },
-];
-
-/**
  * 設定頁面
  *
  * 包含以下設定區塊：
@@ -115,6 +95,9 @@ const mockAccounts = [
  * 註：主題切換功能已移至側邊欄 Logo 旁
  */
 export default function SettingsPage() {
+  // 獲取已連結的帳戶
+  const { accounts, isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
+
   // 通知設定狀態
   const [notifications, setNotifications] = useState({
     fatigueAlert: true,
@@ -129,7 +112,8 @@ export default function SettingsPage() {
   /**
    * 格式化最後同步時間
    */
-  const formatLastSync = (isoString: string) => {
+  const formatLastSync = (isoString: string | undefined) => {
+    if (!isoString) return '尚未同步';
     const date = new Date(isoString);
     return date.toLocaleString('zh-TW', {
       month: 'short',
@@ -156,52 +140,81 @@ export default function SettingsPage() {
         description="管理已連結的廣告平台帳戶"
       >
         <div className="space-y-4">
-          {mockAccounts.map((account) => (
-            <div
-              key={account.id}
-              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    account.platform === 'google'
-                      ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                      : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                  }`}
-                >
-                  {account.platform === 'google' ? 'G' : 'M'}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {account.name}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    最後同步: {formatLastSync(account.lastSync)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {account.status === 'connected' ? (
-                  <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-                    <Check className="w-4 h-4" />
-                    已連結
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-sm text-yellow-600 dark:text-yellow-400">
-                    <AlertCircle className="w-4 h-4" />
-                    需重新授權
-                  </span>
-                )}
-              </div>
+          {isLoadingAccounts ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-sm text-gray-500">載入帳戶中...</span>
             </div>
-          ))}
+          ) : accountsError ? (
+            <div className="text-center py-8">
+              <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm text-red-600 dark:text-red-400">
+                載入帳戶時發生錯誤
+              </p>
+            </div>
+          ) : accounts.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <Link2 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                尚未連結任何廣告帳戶
+              </p>
+              <Link href="/accounts">
+                <Button variant="default" size="sm">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  連結帳戶
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <>
+              {accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        account.platform === 'google'
+                          ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                          : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}
+                    >
+                      {account.platform === 'google' ? 'G' : 'M'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {account.name}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        最後同步: {formatLastSync(account.last_sync_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {account.status === 'active' ? (
+                      <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
+                        <Check className="w-4 h-4" />
+                        已連結
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-yellow-600 dark:text-yellow-400">
+                        <AlertCircle className="w-4 h-4" />
+                        {account.status === 'paused' ? '已暫停' : '需重新授權'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
 
-          <Link href="/accounts">
-            <Button variant="outline" className="w-full mt-2">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              管理帳戶
-            </Button>
-          </Link>
+              <Link href="/accounts">
+                <Button variant="outline" className="w-full mt-2">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  管理帳戶
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </SettingsSection>
 

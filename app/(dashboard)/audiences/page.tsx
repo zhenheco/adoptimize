@@ -9,8 +9,11 @@ import { ExclusionSuggestion, type ExecuteExclusionParams } from '@/components/a
 import { ExpansionSuggestion, type CreateLookalikeParams } from '@/components/audiences/expansion-suggestion';
 import { SuggestionWizard } from '@/components/audiences/smart-suggestion';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Filter, ChevronDown, ArrowUpDown, GitCompareArrows, ChevronUp, Sparkles, Users, Wand2 } from 'lucide-react';
+import { RefreshCw, Filter, ChevronDown, ArrowUpDown, GitCompareArrows, ChevronUp, Sparkles, Users, Wand2, Link2 } from 'lucide-react';
+import Link from 'next/link';
 import type { Audience } from '@/lib/api/types';
+import { useUser } from '@/hooks/use-user';
+import { useAccounts } from '@/hooks/use-accounts';
 import type { AudienceOverlapPair } from '@/lib/utils/audience-overlap';
 import { getExclusionPriority } from '@/lib/utils/exclusion-suggestions';
 import { isSmallAudience, getExpansionPriority } from '@/lib/utils/expansion-suggestions';
@@ -102,9 +105,12 @@ export default function AudiencesPage() {
   // Tab 狀態
   const [activeTab, setActiveTab] = useState<AudienceTab>('analysis');
 
-  // TODO: 從 auth context 取得真實用戶資訊
-  const mockUserId = 'demo-user-123';
-  const mockAccountId = 'demo-account-456';
+  // 從 hooks 取得真實用戶和帳戶資訊
+  const { userId } = useUser();
+  const { accounts } = useAccounts();
+
+  // 取得第一個已連結的帳戶 ID
+  const firstAccountId = accounts.length > 0 ? accounts[0].id : undefined;
 
   const [filters, setFilters] = useState<AudienceFilters>({
     type: 'all',
@@ -356,7 +362,24 @@ export default function AudiencesPage() {
 
       {/* 智慧建議 Tab */}
       {activeTab === 'suggestion' && (
-        <SuggestionWizard userId={mockUserId} accountId={mockAccountId} />
+        !userId || !firstAccountId ? (
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+            <Link2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              尚未連結廣告帳戶
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              請先連結廣告帳戶才能使用智慧建議功能
+            </p>
+            <Link href="/accounts">
+              <Button>
+                連結帳戶
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <SuggestionWizard userId={userId} accountId={firstAccountId} />
+        )
       )}
 
       {/* 受眾分析 Tab */}
