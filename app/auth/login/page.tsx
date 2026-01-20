@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Script from 'next/script'
@@ -15,14 +15,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 /**
- * 登入頁面
+ * 登入頁面內容組件
  *
  * 支援：
  * - Email/密碼登入
  * - Google OAuth 登入
  * - Meta OAuth 登入（使用 Facebook JavaScript SDK）
  */
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
@@ -328,5 +328,26 @@ export default function LoginPage() {
       </CardContent>
     </Card>
     </>
+  )
+}
+
+/**
+ * 登入頁面
+ *
+ * 使用 Suspense 包裹以支援 useSearchParams()
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <Card className="w-full max-w-md mx-4 shadow-xl">
+        <CardContent className="pt-6">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </CardContent>
+      </Card>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }

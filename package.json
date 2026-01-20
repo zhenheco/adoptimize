@@ -5,9 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cloudflare": "opennextjs-cloudflare build",
-    "deploy": "wrangler deploy",
-    "deploy:preview": "wrangler deploy --env preview",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
@@ -35,7 +32,6 @@
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.14.7",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^20.17.10",
@@ -51,7 +47,6 @@
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",
     "vite-tsconfig-paths": "^6.0.3",
-    "vitest": "^2.1.8",
-    "wrangler": "^4.54.0"
+    "vitest": "^2.1.8"
   }
 }

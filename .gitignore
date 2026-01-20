@@ -85,3 +85,4 @@ coverage/
 test-results/
 .vercel
 tsconfig.tsbuildinfo
+.env*.local
