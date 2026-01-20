@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Card,
@@ -14,24 +14,33 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 /**
- * 登入表單內容
+ * 登入頁面
+ *
+ * 支援：
+ * - Email/密碼登入
+ * - Google OAuth 登入
+ * - Meta OAuth 登入（目前停用）
  */
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'meta' | null>(null)
+  const [mounted, setMounted] = useState(false)
 
-  // 從 URL 參數讀取錯誤訊息（例如 OAuth 回調帶回的錯誤）
+  // 確保組件已掛載（客戶端渲染完成）
   useEffect(() => {
-    const urlError = searchParams.get('error')
+    setMounted(true)
+
+    // 從 URL 參數讀取錯誤訊息（使用純客戶端 URLSearchParams）
+    const params = new URLSearchParams(window.location.search)
+    const urlError = params.get('error')
     if (urlError) {
       setError(decodeURIComponent(urlError))
     }
-  }, [searchParams])
+  }, [])
 
   /**
    * 處理 Email/密碼登入
@@ -104,6 +113,19 @@ function LoginForm() {
    */
   const handleMetaLogin = async () => {
     setError('Meta 登入功能維護中，請使用其他登入方式')
+  }
+
+  // 還未掛載時顯示 loading
+  if (!mounted) {
+    return (
+      <Card className="w-full max-w-md mx-4 shadow-xl">
+        <CardContent className="pt-6">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -247,31 +269,5 @@ function LoginForm() {
       </div>
     </CardContent>
   </Card>
-  )
-}
-
-/**
- * 登入頁面
- *
- * 支援：
- * - Email/密碼登入
- * - Google OAuth 登入
- * - Meta OAuth 登入（使用 Facebook JavaScript SDK）
- */
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <Card className="w-full max-w-md mx-4 shadow-xl">
-          <CardContent className="pt-6">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          </CardContent>
-        </Card>
-      }
-    >
-      <LoginForm />
-    </Suspense>
   )
 }
