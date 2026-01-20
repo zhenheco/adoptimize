@@ -6,11 +6,13 @@
 對應 SDD 4.1 API 總覽中的認證端點
 """
 
-from datetime import date
+import httpx
+from datetime import date, datetime
 from typing import Optional
-from uuid import UUID
+from urllib.parse import urlencode
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +34,16 @@ from app.middleware.auth import get_current_user as get_authenticated_user
 from app.models.user import User
 
 router = APIRouter()
+
+# OAuth 配置
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+META_AUTH_URL = "https://www.facebook.com/v18.0/dialog/oauth"
+META_TOKEN_URL = "https://graph.facebook.com/v18.0/oauth/access_token"
+META_USERINFO_URL = "https://graph.facebook.com/v18.0/me"
+META_GRAPH_URL = "https://graph.facebook.com/v18.0"
 
 
 # ============================================================
@@ -99,6 +111,12 @@ class ErrorResponse(BaseModel):
 
     success: bool = False
     error: dict
+
+
+class MetaSDKLoginRequest(BaseModel):
+    """Meta SDK 登入請求"""
+
+    access_token: str = Field(..., description="Facebook SDK access token")
 
 
 # ============================================================
@@ -338,3 +356,537 @@ async def get_current_user(
         "is_active": current_user.is_active,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
     }
+
+
+# ============================================================
+# OAuth 登入端點
+# ============================================================
+
+
+@router.get(
+    "/oauth/google",
+    response_model=dict,
+    responses={
+        200: {"description": "成功產生 Google OAuth 授權 URL"},
+        500: {"description": "伺服器錯誤"},
+    },
+)
+async def google_oauth_login(
+    redirect_uri: str = Query(..., description="OAuth 回調 URI"),
+) -> dict:
+    """
+    Google OAuth 用戶登入
+
+    產生 Google OAuth 授權 URL，供前端重定向用戶到 Google 登入頁面
+    """
+    settings = get_settings()
+
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "OAUTH_NOT_CONFIGURED",
+                "message": "Google OAuth 尚未配置",
+            },
+        )
+
+    # 產生 state 參數用於 CSRF 防護
+    state = str(uuid4())
+
+    # 構建授權 URL
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+    }
+
+    auth_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+
+    return {
+        "auth_url": auth_url,
+        "state": state,
+    }
+
+
+@router.get(
+    "/oauth/google/callback",
+    response_model=dict,
+    responses={
+        200: {"description": "Google OAuth 登入成功"},
+        401: {"description": "OAuth 認證失敗"},
+    },
+)
+async def google_oauth_callback(
+    code: str = Query(..., description="OAuth 授權碼"),
+    redirect_uri: str = Query(..., description="OAuth 回調 URI"),
+    state: Optional[str] = Query(None, description="CSRF state 參數"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Google OAuth 回調處理
+
+    1. 使用授權碼交換 access token
+    2. 使用 access token 獲取用戶資訊
+    3. 創建或登入用戶
+    4. 返回 JWT token
+    """
+    settings = get_settings()
+
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "OAUTH_NOT_CONFIGURED",
+                "message": "Google OAuth 尚未配置",
+            },
+        )
+
+    try:
+        # 1. 使用授權碼交換 access token
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_response.raise_for_status()
+            token_data = token_response.json()
+            access_token = token_data.get("access_token")
+
+            if not access_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "INVALID_TOKEN_RESPONSE",
+                        "message": "無法取得 access token",
+                    },
+                )
+
+            # 2. 使用 access token 獲取用戶資訊
+            userinfo_response = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            userinfo_response.raise_for_status()
+            userinfo = userinfo_response.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name", "")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_USERINFO",
+                    "message": "無法取得用戶 Email",
+                },
+            )
+
+        # 3. 查找或創建用戶
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            # 創建新用戶
+            user = User(
+                email=email,
+                password_hash=None,  # OAuth 用戶沒有密碼
+                name=name,
+                company_name=None,
+                subscription_tier="STARTER",
+                monthly_action_count=0,
+                action_count_reset_at=date.today(),
+                is_active=True,
+                oauth_provider="google",
+                oauth_id=userinfo.get("id"),
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        elif user.oauth_provider != "google":
+            # Email 已存在但使用不同的 OAuth 提供者
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "EMAIL_EXISTS_WITH_DIFFERENT_PROVIDER",
+                    "message": f"此 Email 已使用 {user.oauth_provider} 登入",
+                },
+            )
+
+        # 4. 生成 JWT tokens
+        access_token_jwt = create_access_token(subject=str(user.id))
+        refresh_token_jwt = create_refresh_token(subject=str(user.id))
+
+        return {
+            "success": True,
+            "data": {
+                "access_token": access_token_jwt,
+                "refresh_token": refresh_token_jwt,
+                "token_type": "bearer",
+                "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "name": user.name,
+                    "subscription_tier": user.subscription_tier,
+                },
+            },
+        }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "OAUTH_FAILED",
+                "message": f"Google OAuth 認證失敗: {str(e)}",
+            },
+        )
+
+
+@router.get(
+    "/oauth/meta",
+    response_model=dict,
+    responses={
+        200: {"description": "成功產生 Meta OAuth 授權 URL"},
+        500: {"description": "伺服器錯誤"},
+    },
+)
+async def meta_oauth_login(
+    redirect_uri: str = Query(..., description="OAuth 回調 URI"),
+) -> dict:
+    """
+    Meta OAuth 用戶登入
+
+    產生 Meta OAuth 授權 URL，供前端重定向用戶到 Meta 登入頁面
+    """
+    settings = get_settings()
+
+    if not settings.META_APP_ID or not settings.META_APP_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "OAUTH_NOT_CONFIGURED",
+                "message": "Meta OAuth 尚未配置",
+            },
+        )
+
+    # 產生 state 參數用於 CSRF 防護
+    state = str(uuid4())
+
+    # 構建授權 URL
+    params = {
+        "client_id": settings.META_APP_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "email public_profile",
+        "state": state,
+    }
+
+    auth_url = f"{META_AUTH_URL}?{urlencode(params)}"
+
+    return {
+        "auth_url": auth_url,
+        "state": state,
+    }
+
+
+@router.get(
+    "/oauth/meta/callback",
+    response_model=dict,
+    responses={
+        200: {"description": "Meta OAuth 登入成功"},
+        401: {"description": "OAuth 認證失敗"},
+    },
+)
+async def meta_oauth_callback(
+    code: str = Query(..., description="OAuth 授權碼"),
+    redirect_uri: str = Query(..., description="OAuth 回調 URI"),
+    state: Optional[str] = Query(None, description="CSRF state 參數"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Meta OAuth 回調處理
+
+    1. 使用授權碼交換 access token
+    2. 使用 access token 獲取用戶資訊
+    3. 創建或登入用戶
+    4. 返回 JWT token
+    """
+    settings = get_settings()
+
+    if not settings.META_APP_ID or not settings.META_APP_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "OAUTH_NOT_CONFIGURED",
+                "message": "Meta OAuth 尚未配置",
+            },
+        )
+
+    try:
+        # 1. 使用授權碼交換 access token
+        async with httpx.AsyncClient() as client:
+            token_response = await client.get(
+                META_TOKEN_URL,
+                params={
+                    "client_id": settings.META_APP_ID,
+                    "client_secret": settings.META_APP_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "code": code,
+                },
+            )
+            token_response.raise_for_status()
+            token_data = token_response.json()
+            access_token = token_data.get("access_token")
+
+            if not access_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "INVALID_TOKEN_RESPONSE",
+                        "message": "無法取得 access token",
+                    },
+                )
+
+            # 2. 使用 access token 獲取用戶資訊
+            userinfo_response = await client.get(
+                META_USERINFO_URL,
+                params={
+                    "fields": "id,name,email",
+                    "access_token": access_token,
+                },
+            )
+            userinfo_response.raise_for_status()
+            userinfo = userinfo_response.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name", "")
+        meta_id = userinfo.get("id")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_USERINFO",
+                    "message": "無法取得用戶 Email",
+                },
+            )
+
+        # 3. 查找或創建用戶
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            # 創建新用戶
+            user = User(
+                email=email,
+                password_hash=None,  # OAuth 用戶沒有密碼
+                name=name,
+                company_name=None,
+                subscription_tier="STARTER",
+                monthly_action_count=0,
+                action_count_reset_at=date.today(),
+                is_active=True,
+                oauth_provider="meta",
+                oauth_id=meta_id,
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        elif user.oauth_provider != "meta":
+            # Email 已存在但使用不同的 OAuth 提供者
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "EMAIL_EXISTS_WITH_DIFFERENT_PROVIDER",
+                    "message": f"此 Email 已使用 {user.oauth_provider} 登入",
+                },
+            )
+
+        # 4. 生成 JWT tokens
+        access_token_jwt = create_access_token(subject=str(user.id))
+        refresh_token_jwt = create_refresh_token(subject=str(user.id))
+
+        return {
+            "success": True,
+            "data": {
+                "access_token": access_token_jwt,
+                "refresh_token": refresh_token_jwt,
+                "token_type": "bearer",
+                "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "name": user.name,
+                    "subscription_tier": user.subscription_tier,
+                },
+            },
+        }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "OAUTH_FAILED",
+                "message": f"Meta OAuth 認證失敗: {str(e)}",
+            },
+        )
+
+
+@router.post(
+    "/oauth/meta/sdk",
+    response_model=dict,
+    responses={
+        200: {"description": "Meta SDK OAuth 登入成功"},
+        401: {"description": "OAuth 認證失敗"},
+    },
+)
+async def meta_sdk_oauth_login(
+    login_data: MetaSDKLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Meta OAuth SDK 登入
+
+    接收從 Facebook JavaScript SDK 獲取的 access token，
+    驗證並創建或登入用戶
+    """
+    settings = get_settings()
+
+    if not settings.META_APP_ID or not settings.META_APP_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "OAUTH_NOT_CONFIGURED",
+                "message": "Meta OAuth 尚未配置",
+            },
+        )
+
+    try:
+        # 1. 使用 access token 獲取用戶資訊
+        async with httpx.AsyncClient() as client:
+            # Debug token 以驗證
+            debug_response = await client.get(
+                f"{META_GRAPH_URL}/debug_token",
+                params={
+                    "input_token": login_data.access_token,
+                    "access_token": f"{settings.META_APP_ID}|{settings.META_APP_SECRET}",
+                },
+            )
+
+            if debug_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "INVALID_TOKEN",
+                        "message": "無效的 access token",
+                    },
+                )
+
+            debug_data = debug_response.json()
+            debug_token_data = debug_data.get("data", {})
+
+            # 驗證 token 是否屬於此應用
+            if debug_token_data.get("app_id") != settings.META_APP_ID:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "TOKEN_APP_MISMATCH",
+                        "message": "Token 不屬於此應用",
+                    },
+                )
+
+            # 獲取用戶資訊
+            userinfo_response = await client.get(
+                META_USERINFO_URL,
+                params={
+                    "fields": "id,name,email",
+                    "access_token": login_data.access_token,
+                },
+            )
+            userinfo_response.raise_for_status()
+            userinfo = userinfo_response.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name", "")
+        meta_id = userinfo.get("id")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_USERINFO",
+                    "message": "無法取得用戶 Email",
+                },
+            )
+
+        # 2. 查找或創建用戶
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            # 創建新用戶
+            user = User(
+                email=email,
+                password_hash=None,  # OAuth 用戶沒有密碼
+                name=name,
+                company_name=None,
+                subscription_tier="STARTER",
+                monthly_action_count=0,
+                action_count_reset_at=date.today(),
+                is_active=True,
+                oauth_provider="meta",
+                oauth_id=meta_id,
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        elif user.oauth_provider != "meta":
+            # Email 已存在但使用不同的 OAuth 提供者
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "EMAIL_EXISTS_WITH_DIFFERENT_PROVIDER",
+                    "message": f"此 Email 已使用 {user.oauth_provider} 登入",
+                },
+            )
+
+        # 3. 生成 JWT tokens
+        access_token_jwt = create_access_token(subject=str(user.id))
+        refresh_token_jwt = create_refresh_token(subject=str(user.id))
+
+        return {
+            "success": True,
+            "data": {
+                "access_token": access_token_jwt,
+                "refresh_token": refresh_token_jwt,
+                "token_type": "bearer",
+                "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "name": user.name,
+                    "subscription_tier": user.subscription_tier,
+                },
+            },
+        }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "OAUTH_FAILED",
+                "message": f"Meta OAuth 認證失敗: {str(e)}",
+            },
+        )
+

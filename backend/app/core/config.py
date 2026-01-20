@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     GOOGLE_ADS_DEVELOPER_TOKEN: Optional[str] = None
     GOOGLE_ADS_REFRESH_TOKEN: Optional[str] = None
 
+    # Google OAuth 用戶登入設定
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
     # Meta Marketing API 設定
     META_APP_ID: Optional[str] = None
     META_APP_SECRET: Optional[str] = None

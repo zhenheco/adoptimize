@@ -90,6 +90,16 @@ class User(Base):
         default=True,
         comment="是否啟用",
     )
+    oauth_provider: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="OAuth 提供者 (google, meta)",
+    )
+    oauth_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="OAuth 提供者的用戶 ID",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

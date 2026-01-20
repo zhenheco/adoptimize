@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Script from 'next/script'
 import {
   Card,
   CardContent,
@@ -18,15 +19,39 @@ import { Input } from '@/components/ui/input'
  *
  * 支援：
  * - Email/密碼登入
- * - Google OAuth 登入（憑證待準備）
- * - Meta OAuth 登入（憑證待準備）
+ * - Google OAuth 登入
+ * - Meta OAuth 登入（使用 Facebook JavaScript SDK）
  */
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'meta' | null>(null)
+  const [fbLoaded, setFbLoaded] = useState(false)
+
+  // 從 URL 參數讀取錯誤訊息（例如 OAuth 回調帶回的錯誤）
+  useEffect(() => {
+    const urlError = searchParams.get('error')
+    if (urlError) {
+      setError(decodeURIComponent(urlError))
+    }
+  }, [searchParams])
+
+  // Facebook SDK 初始化
+  const initFacebookSDK = () => {
+    if (typeof window !== 'undefined' && (window as any).FB) {
+      ;(window as any).FB.init({
+        appId: process.env.NEXT_PUBLIC_META_APP_ID || '1336497714898181',
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0',
+      })
+      setFbLoaded(true)
+    }
+  }
 
   /**
    * 處理 Email/密碼登入
@@ -69,27 +94,101 @@ export default function LoginPage() {
 
   /**
    * 處理 Google 登入
-   * OAuth 憑證尚未準備，目前為模擬模式
+   * 透過後端取得 OAuth 授權 URL 並重定向
    */
-  const handleGoogleLogin = () => {
-    // TODO: 實際 OAuth 流程
-    // window.location.href = '/api/v1/accounts/connect/google';
-    router.push('/dashboard')
+  const handleGoogleLogin = async () => {
+    setError(null)
+    setOauthLoading('google')
+
+    try {
+      const response = await fetch('/api/v1/auth/oauth/google')
+      const data = await response.json()
+
+      if (!response.ok || !data.auth_url) {
+        setError(data.error || '無法啟動 Google 登入')
+        setOauthLoading(null)
+        return
+      }
+
+      // 重定向到 Google OAuth 授權頁面
+      window.location.href = data.auth_url
+    } catch (err) {
+      setError('無法連接到伺服器，請稍後再試')
+      setOauthLoading(null)
+    }
   }
 
   /**
    * 處理 Meta 登入
-   * OAuth 憑證尚未準備，目前為模擬模式
+   * 使用 Facebook JavaScript SDK
    */
-  const handleMetaLogin = () => {
-    // TODO: 實際 OAuth 流程
-    // window.location.href = '/api/v1/accounts/connect/meta';
-    router.push('/dashboard')
+  const handleMetaLogin = async () => {
+    setError(null)
+    setOauthLoading('meta')
+
+    if (!fbLoaded) {
+      setError('Facebook SDK 尚未載入，請稍後再試')
+      setOauthLoading(null)
+      return
+    }
+
+    try {
+      ;(window as any).FB.login(
+        async (response: any) => {
+          if (response.authResponse) {
+            // 使用 access token 登入後端
+            const { accessToken } = response.authResponse
+
+            const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ access_token: accessToken }),
+            })
+
+            const data = await loginResponse.json()
+
+            if (!loginResponse.ok || !data.success) {
+              setError(data.error || 'Meta 登入失敗')
+              setOauthLoading(null)
+              return
+            }
+
+            // 存儲 access token 到 localStorage
+            if (data.data?.access_token) {
+              localStorage.setItem('access_token', data.data.access_token)
+              localStorage.setItem('user', JSON.stringify(data.data.user))
+            }
+
+            // 跳轉到 dashboard
+            router.push('/dashboard')
+          } else {
+            setError('Meta 登入取消')
+            setOauthLoading(null)
+          }
+        },
+        { scope: 'email,public_profile' }
+      )
+    } catch (err) {
+      setError('無法連接到伺服器，請稍後再試')
+      setOauthLoading(null)
+    }
   }
 
   return (
-    <Card className="w-full max-w-md mx-4 shadow-xl">
-      <CardHeader className="text-center space-y-4">
+    <>
+      {/* Facebook SDK */}
+      <Script
+        src="https://connect.facebook.net/en_US/sdk.js"
+        strategy="afterInteractive"
+        onReady={() => {
+          initFacebookSDK()
+        }}
+      />
+
+      <Card className="w-full max-w-md mx-4 shadow-xl">
+        <CardHeader className="text-center space-y-4">
         {/* Logo */}
         <div className="flex justify-center">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -177,7 +276,7 @@ export default function LoginPage() {
           variant="outline"
           className="w-full h-12 text-base font-medium relative"
           onClick={handleGoogleLogin}
-          disabled={isLoading}
+          disabled={isLoading || oauthLoading === 'google'}
         >
           <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -207,7 +306,7 @@ export default function LoginPage() {
           variant="outline"
           className="w-full h-12 text-base font-medium relative"
           onClick={handleMetaLogin}
-          disabled={isLoading}
+          disabled={isLoading || oauthLoading === 'meta'}
         >
           <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#1877F2">
@@ -216,11 +315,6 @@ export default function LoginPage() {
           </div>
           使用 Meta 帳號登入
         </Button>
-
-        {/* 提示訊息 */}
-        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
-          OAuth 登入功能開發中，目前點擊將直接進入儀表板
-        </p>
 
         {/* 返回首頁連結 */}
         <div className="text-center pt-4">
@@ -233,5 +327,6 @@ export default function LoginPage() {
         </div>
       </CardContent>
     </Card>
+    </>
   )
 }
