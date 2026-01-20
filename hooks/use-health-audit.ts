@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { HealthAudit, AuditIssue, ApiResponse } from '@/lib/api/types';
+import type { HealthAudit, AuditIssue } from '@/lib/api/types';
 
 /**
  * useHealthAudit Hook 回傳型別
@@ -54,11 +54,15 @@ export function useHealthAudit(accountId?: string): UseHealthAuditReturn {
         throw new Error(`API 請求失敗: ${response.status}`);
       }
 
-      const result: ApiResponse<{ audit: HealthAudit; issues: AuditIssue[] }> =
-        await response.json();
+      // 後端返回 { data: { id, overall_score, ..., issues: [...] } }
+      // 其中 issues 直接包含在 data 中
+      const result = await response.json();
+      const auditData = result.data;
 
-      setAudit(result.data.audit);
-      setIssues(result.data.issues);
+      // 提取 audit 資訊（不含 issues）
+      const { issues: issuesList, ...auditInfo } = auditData;
+      setAudit(auditInfo as HealthAudit);
+      setIssues(issuesList || []);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('未知錯誤'));
     } finally {

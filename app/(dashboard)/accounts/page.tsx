@@ -254,7 +254,11 @@ function AccountsContent() {
         }
       } else {
         const error = await response.json();
-        setToast({ type: 'error', message: error.error || '無法取得授權連結' });
+        // 確保錯誤訊息是字串，不是物件
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
       }
     } catch (error) {
       console.error('Connect Google error:', error);
@@ -282,7 +286,11 @@ function AccountsContent() {
         }
       } else {
         const error = await response.json();
-        setToast({ type: 'error', message: error.error || '無法取得授權連結' });
+        // 確保錯誤訊息是字串，不是物件
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
       }
     } catch (error) {
       console.error('Connect Meta error:', error);

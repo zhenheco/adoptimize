@@ -42,8 +42,12 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.json();
+      // 確保錯誤訊息是字串，不是物件
+      const errorMessage = typeof error.detail === 'string'
+        ? error.detail
+        : error.detail?.message || 'Failed to get auth URL';
       return NextResponse.json(
-        { error: error.detail || 'Failed to get auth URL' },
+        { error: errorMessage },
         { status: response.status }
       );
     }

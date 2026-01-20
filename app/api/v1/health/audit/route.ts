@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { HealthAudit, AuditIssue, ApiResponse } from '@/lib/api/types';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
@@ -16,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const response = await fetch(
-      `${PYTHON_API_URL}/api/v1/audits/latest?${searchParams.toString()}`,
+      `${PYTHON_API_URL}/api/v1/health/audit?${searchParams.toString()}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
 
-    const response = await fetch(`${PYTHON_API_URL}/api/v1/audits`, {
+    const response = await fetch(`${PYTHON_API_URL}/api/v1/health/audit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
