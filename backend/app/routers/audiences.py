@@ -9,7 +9,7 @@
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
-from app.models import Audience as AudienceModel, AudienceMetrics as AudienceMetricsModel
+from app.models import Audience as AudienceModel
 from app.services.audience_health import (
     AudienceHealthInput,
     calculate_audience_health,
@@ -76,57 +76,6 @@ class OverlapAnalysisResponse(BaseModel):
 
     pairs: list[OverlapPair]
     meta: dict
-
-
-def _generate_mock_audiences(count: int = 12) -> list[Audience]:
-    """產生模擬受眾資料"""
-    audience_types = ["CUSTOM", "LOOKALIKE", "SAVED"]
-    sources = ["WEBSITE", "CUSTOMER_LIST", "APP"]
-    audiences = []
-
-    for i in range(count):
-        audience_type = audience_types[i % 3]
-        source = sources[i % 3]
-
-        # 模擬不同規模和表現的受眾
-        size = 50000 + (i * 25000)
-        avg_cpa = 20.0  # 假設平均 CPA
-        cpa = avg_cpa * (0.7 + (i * 0.1))  # 不同表現
-        roas = 3.0 - (i * 0.15)  # 不同 ROAS
-
-        # 計算健康度
-        days_since_update = i * 5  # 模擬不同新鮮度
-        health_input = AudienceHealthInput(
-            size=size,
-            cpa=cpa,
-            account_avg_cpa=avg_cpa,
-            roas=roas,
-            days_since_update=days_since_update,
-        )
-        health_result = calculate_audience_health(health_input)
-        health_status = get_audience_health_status(health_result.score)
-
-        audiences.append(
-            Audience(
-                id=str(uuid.uuid4()),
-                name=f"Audience {i + 1} - {audience_type}",
-                type=audience_type,
-                size=size,
-                source=source,
-                metrics=AudienceMetrics(
-                    reach=int(size * 0.6),
-                    impressions=size * 3,
-                    conversions=int(size * 0.002),
-                    spend=cpa * size * 0.002,
-                    cpa=round(cpa, 2),
-                    roas=round(roas, 2),
-                ),
-                health_score=health_result.score,
-                health_status=health_status.value,
-            )
-        )
-
-    return audiences
 
 
 def _calculate_health_from_metrics(audience_record: AudienceModel) -> tuple[int, str]:
@@ -229,27 +178,18 @@ async def get_audiences(
     Returns:
         AudienceListResponse: 受眾列表與分頁資訊
     """
-    try:
-        # 從資料庫取得受眾
-        query = select(AudienceModel).options(selectinload(AudienceModel.metrics))
+    # 從資料庫取得受眾
+    query = select(AudienceModel).options(selectinload(AudienceModel.metrics))
 
-        # 類型篩選
-        if type:
-            query = query.where(AudienceModel.type == type.upper())
+    # 類型篩選
+    if type:
+        query = query.where(AudienceModel.type == type.upper())
 
-        result = await db.execute(query)
-        audience_records = result.scalars().all()
+    result = await db.execute(query)
+    audience_records = result.scalars().all()
 
-        # 如果資料庫無資料，返回模擬數據
-        if not audience_records:
-            all_audiences = _generate_mock_audiences(24)
-        else:
-            all_audiences = [_convert_db_audience_to_response(a) for a in audience_records]
-    except Exception as e:
-        # 資料庫連線失敗時，返回模擬數據
-        import logging
-        logging.warning(f"Database connection failed, returning mock data: {e}")
-        all_audiences = _generate_mock_audiences(24)
+    # 轉換為 API 回應格式
+    all_audiences = [_convert_db_audience_to_response(a) for a in audience_records]
 
     # 健康狀態篩選
     if health_status:
@@ -308,78 +248,23 @@ async def get_audience_overlap(
     """
     # TODO: 實作實際的重疊分析
     # 這需要從廣告平台 API 取得重疊數據
+    # 目前返回空列表，待廣告平台 API 整合後實作
 
-    audience_records = []
-    try:
-        # 從資料庫取得受眾名稱
-        query = select(AudienceModel)
-        if account_id:
-            try:
-                account_uuid = uuid.UUID(account_id)
-                query = query.where(AudienceModel.account_id == account_uuid)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid account_id format")
+    # 驗證 account_id 格式
+    if account_id:
+        try:
+            uuid.UUID(account_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid account_id format")
 
-        result = await db.execute(query.limit(10))
-        audience_records = result.scalars().all()
-    except Exception as e:
-        # 資料庫連線失敗時，使用空列表（將回傳模擬數據）
-        import logging
-        logging.warning(f"Database connection failed, returning mock data: {e}")
-        audience_records = []
-
-    # 使用真實受眾名稱生成模擬重疊資料
-    if len(audience_records) >= 2:
-        pairs = []
-        for i in range(min(3, len(audience_records) - 1)):
-            a = audience_records[i]
-            b = audience_records[i + 1]
-            overlap_rate = 0.35 - (i * 0.1)
-            status = "danger" if overlap_rate >= 0.3 else ("warning" if overlap_rate >= 0.2 else "normal")
-            pairs.append(
-                OverlapPair(
-                    audience_a={"id": str(a.id), "name": a.name or "Audience A"},
-                    audience_b={"id": str(b.id), "name": b.name or "Audience B"},
-                    overlap_rate=overlap_rate,
-                    status=status,
-                    recommendation="考慮將其中一個受眾從另一個排除" if status == "danger" else "重疊率在可接受範圍內",
-                )
-            )
-    else:
-        # 模擬重疊資料
-        pairs = [
-            OverlapPair(
-                audience_a={"id": str(uuid.uuid4()), "name": "Website Visitors"},
-                audience_b={"id": str(uuid.uuid4()), "name": "Lookalike 1%"},
-                overlap_rate=0.35,
-                status="danger",
-                recommendation="考慮將其中一個受眾從另一個排除",
-            ),
-            OverlapPair(
-                audience_a={"id": str(uuid.uuid4()), "name": "Cart Abandoners"},
-                audience_b={"id": str(uuid.uuid4()), "name": "All Customers"},
-                overlap_rate=0.25,
-                status="warning",
-                recommendation="排除已購買者可提升廣告效率",
-            ),
-            OverlapPair(
-                audience_a={"id": str(uuid.uuid4()), "name": "Lookalike 1%"},
-                audience_b={"id": str(uuid.uuid4()), "name": "Lookalike 2%"},
-                overlap_rate=0.15,
-                status="normal",
-                recommendation="重疊率在可接受範圍內",
-            ),
-        ]
-
-    # 篩選超過門檻的
-    filtered_pairs = [p for p in pairs if p.overlap_rate >= threshold]
-
+    # 重疊分析需要從廣告平台 API 取得，目前返回空結果
     return OverlapAnalysisResponse(
-        pairs=filtered_pairs,
+        pairs=[],
         meta={
             "threshold": threshold,
-            "total_pairs_analyzed": len(pairs),
-            "pairs_above_threshold": len(filtered_pairs),
+            "total_pairs_analyzed": 0,
+            "pairs_above_threshold": 0,
+            "message": "Overlap analysis requires ad platform API integration",
         },
     )
 

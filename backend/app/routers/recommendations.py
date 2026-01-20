@@ -25,14 +25,7 @@ from app.services.action_limiter import (
     increment_action_count,
     get_tier_from_string,
 )
-from app.services.recommendation_engine import (
-    ActionDifficulty,
-    ActionModule,
-    ActionParams,
-    Recommendation as RecommendationServiceModel,
-    RecommendationStatus,
-    calculate_priority_score,
-)
+# Note: recommendation_engine 服務在生成建議時使用，API 路由只負責讀取/更新資料
 
 router = APIRouter()
 
@@ -93,68 +86,6 @@ class ActionHistoryResponse(BaseModel):
     meta: dict
 
 
-def _generate_mock_recommendations(count: int = 15) -> list[Recommendation]:
-    """產生模擬建議資料"""
-    from app.services.audit_engine import IssueSeverity
-
-    recommendation_types = [
-        ("pause_fatigued_creative", "暫停疲勞素材", ActionModule.PAUSE_CREATIVE),
-        ("reduce_budget", "降低低效預算", ActionModule.ADJUST_BUDGET),
-        ("exclude_audience", "排除重疊受眾", ActionModule.ADD_EXCLUSION),
-        ("fix_tracking", "修復追蹤設定", ActionModule.MANUAL_FIX),
-        ("pause_campaign", "暫停低效廣告活動", ActionModule.PAUSE_CAMPAIGN),
-    ]
-
-    recommendations = []
-
-    for i in range(count):
-        rec_type, title_base, action_module = recommendation_types[i % len(recommendation_types)]
-
-        # 計算優先級分數
-        impact_score = 500 - (i * 30)  # 模擬不同影響金額
-        difficulty = ActionDifficulty.ONE_CLICK if i % 3 == 0 else ActionDifficulty.SIMPLE
-        entity_count = 1 + (i % 5)
-        severity = IssueSeverity.HIGH if i < 5 else IssueSeverity.MEDIUM
-
-        priority = calculate_priority_score(
-            severity=severity,
-            estimated_impact=impact_score,
-            difficulty=difficulty,
-            affected_entities_count=entity_count,
-        )
-
-        # 決定狀態
-        if i < 3:
-            status = "pending"
-        elif i < 8:
-            status = "executed"
-        else:
-            status = "ignored"
-
-        recommendations.append(
-            Recommendation(
-                id=str(uuid.uuid4()),
-                type=rec_type,
-                priority_score=priority,
-                title=f"{title_base} #{i + 1}",
-                description=f"建議說明：根據分析，此項目需要進行 {title_base} 操作以優化廣告效能。",
-                action_module=action_module.value,
-                action_params={
-                    "target_id": str(uuid.uuid4()),
-                    "target_type": "creative" if "creative" in rec_type else "campaign",
-                },
-                estimated_impact=round(impact_score, 2),
-                status=status,
-                created_at=datetime.now(timezone.utc).isoformat(),
-            )
-        )
-
-    # 按優先級排序
-    recommendations.sort(key=lambda x: x.priority_score, reverse=True)
-
-    return recommendations
-
-
 def _convert_db_recommendation_to_response(rec: RecommendationDBModel) -> Recommendation:
     """將資料庫記錄轉換為 API 回應格式"""
     return Recommendation(
@@ -200,43 +131,22 @@ async def get_recommendations(
     Returns:
         RecommendationListResponse: 建議列表與分頁資訊
     """
-    try:
-        # 從資料庫取得建議
-        query = select(RecommendationDBModel)
+    # 從資料庫取得建議
+    query = select(RecommendationDBModel)
 
-        # 狀態篩選
-        if status:
-            query = query.where(RecommendationDBModel.status == status)
+    # 狀態篩選
+    if status:
+        query = query.where(RecommendationDBModel.status == status)
 
-        # 類型篩選
-        if type:
-            query = query.where(RecommendationDBModel.type == type)
+    # 類型篩選
+    if type:
+        query = query.where(RecommendationDBModel.type == type)
 
-        result = await db.execute(query)
-        rec_records = result.scalars().all()
+    result = await db.execute(query)
+    rec_records = result.scalars().all()
 
-        # 如果資料庫無資料，返回模擬數據
-        if not rec_records:
-            all_recommendations = _generate_mock_recommendations(30)
-            # 狀態篩選
-            if status:
-                all_recommendations = [r for r in all_recommendations if r.status == status]
-            # 類型篩選
-            if type:
-                all_recommendations = [r for r in all_recommendations if r.type == type]
-        else:
-            all_recommendations = [_convert_db_recommendation_to_response(r) for r in rec_records]
-    except Exception as e:
-        # 資料庫連線失敗時，返回模擬數據
-        import logging
-        logging.warning(f"Database connection failed, returning mock data: {e}")
-        all_recommendations = _generate_mock_recommendations(30)
-        # 狀態篩選
-        if status:
-            all_recommendations = [r for r in all_recommendations if r.status == status]
-        # 類型篩選
-        if type:
-            all_recommendations = [r for r in all_recommendations if r.type == type]
+    # 轉換為 API 回應格式
+    all_recommendations = [_convert_db_recommendation_to_response(r) for r in rec_records]
 
     # 排序
     reverse = sort_order == "desc"
@@ -370,18 +280,10 @@ async def execute_recommendation(
     )
     rec_record = result.scalar_one_or_none()
 
-    executed_at = datetime.now(timezone.utc)
-
     if not rec_record:
-        # 模擬模式：如果資料庫無資料，仍返回成功
-        return RecommendationActionResponse(
-            success=True,
-            recommendation_id=recommendation_id,
-            new_status="executed",
-            message="建議已成功執行 (simulated)",
-            executed_at=executed_at.isoformat(),
-            remaining_actions=limit_result.remaining_actions if limit_result else None,
-        )
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    executed_at = datetime.now(timezone.utc)
 
     # 記錄操作前狀態
     before_state = {"status": rec_record.status}
@@ -460,13 +362,7 @@ async def ignore_recommendation(
     rec_record = result.scalar_one_or_none()
 
     if not rec_record:
-        # 模擬模式：如果資料庫無資料，仍返回成功
-        return RecommendationActionResponse(
-            success=True,
-            recommendation_id=recommendation_id,
-            new_status="ignored",
-            message="建議已忽略 (simulated)",
-        )
+        raise HTTPException(status_code=404, detail="Recommendation not found")
 
     # 更新建議狀態
     rec_record.status = "ignored"
@@ -501,67 +397,23 @@ async def get_action_history(
     Returns:
         ActionHistoryResponse: 操作歷史列表
     """
-    history_records = []
-    try:
-        # 計算查詢起始日期
-        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    # 計算查詢起始日期
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # 建立查詢
-        query = select(ActionHistoryDBModel).where(
-            ActionHistoryDBModel.created_at >= start_date
-        )
+    # 建立查詢
+    query = select(ActionHistoryDBModel).where(
+        ActionHistoryDBModel.created_at >= start_date
+    )
 
-        # 操作類型篩選
-        if action_type:
-            query = query.where(ActionHistoryDBModel.action_type == action_type)
+    # 操作類型篩選
+    if action_type:
+        query = query.where(ActionHistoryDBModel.action_type == action_type)
 
-        # 排序（最新在前）
-        query = query.order_by(ActionHistoryDBModel.created_at.desc())
+    # 排序（最新在前）
+    query = query.order_by(ActionHistoryDBModel.created_at.desc())
 
-        result = await db.execute(query)
-        history_records = result.scalars().all()
-    except Exception as e:
-        # 資料庫連線失敗時，返回空列表（將回傳模擬數據）
-        import logging
-        logging.warning(f"Database connection failed, returning mock data: {e}")
-        history_records = []
-
-    # 如果資料庫無資料，返回模擬數據
-    if not history_records:
-        mock_history = [
-            ActionHistoryItem(
-                id=str(uuid.uuid4()),
-                recommendation_id=str(uuid.uuid4()),
-                action_type="PAUSE",
-                target_type="CREATIVE",
-                target_id=str(uuid.uuid4()),
-                before_state={"status": "active"},
-                after_state={"status": "paused"},
-                created_at=datetime.now(timezone.utc).isoformat(),
-                reverted=False,
-            ),
-            ActionHistoryItem(
-                id=str(uuid.uuid4()),
-                recommendation_id=str(uuid.uuid4()),
-                action_type="BUDGET_CHANGE",
-                target_type="CAMPAIGN",
-                target_id=str(uuid.uuid4()),
-                before_state={"budget": 100.0},
-                after_state={"budget": 80.0},
-                created_at=datetime.now(timezone.utc).isoformat(),
-                reverted=False,
-            ),
-        ]
-        return ActionHistoryResponse(
-            data=mock_history,
-            meta={
-                "page": page,
-                "page_size": page_size,
-                "total": len(mock_history),
-                "total_pages": 1,
-                "days": days,
-            },
-        )
+    result = await db.execute(query)
+    history_records = result.scalars().all()
 
     # 轉換為回應格式
     all_history = [

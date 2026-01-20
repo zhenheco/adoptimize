@@ -10,7 +10,7 @@
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -592,67 +592,13 @@ async def get_dashboard_alerts(
     """
     # TODO: 實作真正的異常檢測邏輯
     # 需要查詢最近數據，比較歷史數據，檢測異常模式
-
-    # 模擬警示數據
-    now = datetime.now(timezone.utc)
-    alerts = [
-        Alert(
-            id=str(uuid.uuid4()),
-            type="anomaly",
-            severity="high",
-            title="CPA 異常上升",
-            description="過去 3 天 CPA 上升 45%，超出正常波動範圍",
-            metric="cpa",
-            value=18.5,
-            threshold=12.0,
-            created_at=now.isoformat(),
-        ),
-        Alert(
-            id=str(uuid.uuid4()),
-            type="threshold",
-            severity="medium",
-            title="ROAS 低於目標",
-            description="當前 ROAS 為 2.8，低於目標值 3.5",
-            metric="roas",
-            value=2.8,
-            threshold=3.5,
-            created_at=(now - timedelta(hours=2)).isoformat(),
-        ),
-        Alert(
-            id=str(uuid.uuid4()),
-            type="trend",
-            severity="medium",
-            title="轉換率持續下降",
-            description="轉換率連續 5 天下降，累計下降 15%",
-            metric="conversion_rate",
-            value=2.1,
-            threshold=None,
-            created_at=(now - timedelta(hours=5)).isoformat(),
-        ),
-        Alert(
-            id=str(uuid.uuid4()),
-            type="anomaly",
-            severity="low",
-            title="曝光量波動",
-            description="今日曝光量較昨日減少 20%",
-            metric="impressions",
-            value=40000,
-            threshold=50000,
-            created_at=(now - timedelta(hours=8)).isoformat(),
-        ),
-    ]
-
-    # 篩選嚴重度
-    if severity:
-        alerts = [a for a in alerts if a.severity == severity]
-
-    # 限制數量
-    alerts = alerts[:limit]
+    # 目前返回空列表，待異常檢測服務實作後整合
 
     return AlertsResponse(
-        data=alerts,
+        data=[],
         meta={
-            "total": len(alerts),
+            "total": 0,
             "filtered_by_severity": severity,
+            "message": "Alert detection service not yet implemented",
         },
     )

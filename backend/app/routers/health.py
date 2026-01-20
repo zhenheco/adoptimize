@@ -22,13 +22,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
 from app.models import AuditIssue as AuditIssueModel, HealthAudit as HealthAuditModel
-from app.services.audit_engine import (
-    AuditInput,
-    DimensionInput,
-    calculate_audit_score,
-    get_audit_grade,
-    ALL_ISSUES,
-)
+from app.services.audit_engine import get_audit_grade
 
 router = APIRouter()
 
@@ -93,82 +87,6 @@ class TriggerAuditResponse(BaseModel):
     success: bool
     task_id: str
     message: str
-
-
-def _generate_mock_audit(account_id: str) -> HealthAuditWithIssues:
-    """產生模擬健檢報告"""
-
-    # 模擬各維度分數（使用 DimensionInput 正確的欄位）
-    # DimensionInput(base_score, issues) - 分數會根據 issues 扣分計算
-    # 這裡模擬不同的 base_score 來產生不同的維度分數
-    audit_input = AuditInput(
-        structure=DimensionInput(base_score=85, issues=[]),  # 85 分
-        creative=DimensionInput(base_score=60, issues=[]),   # 60 分
-        audience=DimensionInput(base_score=75, issues=[]),   # 75 分
-        budget=DimensionInput(base_score=80, issues=[]),     # 80 分
-        tracking=DimensionInput(base_score=65, issues=[]),   # 65 分
-    )
-    audit_result = calculate_audit_score(audit_input)
-
-    # 用於前端顯示的維度數據
-    dimensions = {
-        "structure": {"score": 85, "weight": 0.20, "issues_count": 2},
-        "creative": {"score": 60, "weight": 0.25, "issues_count": 5},
-        "audience": {"score": 75, "weight": 0.25, "issues_count": 3},
-        "budget": {"score": 80, "weight": 0.20, "issues_count": 1},
-        "tracking": {"score": 65, "weight": 0.10, "issues_count": 2},
-    }
-    grade = get_audit_grade(audit_result.overall_score)
-
-    # 產生模擬問題
-    issues = []
-    # 使用實際存在的問題代碼
-    sample_issues = [
-        ("CREATIVE_FATIGUE", "CREATIVE", "HIGH"),
-        ("LOW_VARIETY", "CREATIVE", "MEDIUM"),
-        ("HIGH_OVERLAP", "AUDIENCE", "HIGH"),
-        ("SIZE_TOO_SMALL", "AUDIENCE", "MEDIUM"),
-        ("INEFFICIENT_ALLOCATION", "BUDGET", "LOW"),
-        ("POOR_NAMING", "STRUCTURE", "LOW"),
-        ("INCOMPLETE_FUNNEL", "TRACKING", "MEDIUM"),
-    ]
-
-    for code, category, severity in sample_issues:
-        # ALL_ISSUES 是 dict，使用 .get() 取得問題定義
-        issue_def = ALL_ISSUES.get(code)
-        if issue_def:
-            issues.append(
-                AuditIssue(
-                    id=str(uuid.uuid4()),
-                    category=category,
-                    severity=severity,
-                    issue_code=code,
-                    title=issue_def.title,
-                    description=issue_def.description,
-                    impact_description=issue_def.impact_description,
-                    solution=issue_def.solution,
-                    affected_entities=[str(uuid.uuid4())],
-                    status="open",
-                )
-            )
-
-    return HealthAuditWithIssues(
-        id=str(uuid.uuid4()),
-        account_id=account_id,
-        overall_score=audit_result.overall_score,
-        dimensions={
-            name: AuditDimension(
-                score=dim["score"],
-                weight=dim["weight"],
-                issues=dim["issues_count"],
-            )
-            for name, dim in dimensions.items()
-        },
-        grade=grade.value,
-        issues_count=len(issues),
-        created_at=datetime.now(timezone.utc).isoformat(),
-        issues=issues,
-    )
 
 
 def _convert_db_audit_to_response(audit_record: HealthAuditModel) -> HealthAuditWithIssues:
@@ -268,41 +186,30 @@ async def get_latest_audit(
     Returns:
         HealthAuditResponse: 最新健檢報告
     """
-    default_account_id = account_id or str(uuid.uuid4())
+    # 從資料庫取得最新健檢報告
+    query = (
+        select(HealthAuditModel)
+        .options(selectinload(HealthAuditModel.issues))
+        .order_by(HealthAuditModel.created_at.desc())
+    )
 
-    try:
-        # 從資料庫取得最新健檢報告
-        query = (
-            select(HealthAuditModel)
-            .options(selectinload(HealthAuditModel.issues))
-            .order_by(HealthAuditModel.created_at.desc())
-        )
+    # 驗證 account_id 格式並加入篩選條件
+    if account_id:
+        try:
+            account_uuid = uuid.UUID(account_id)
+            query = query.where(HealthAuditModel.account_id == account_uuid)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid account_id format")
 
-        if account_id:
-            try:
-                account_uuid = uuid.UUID(account_id)
-                query = query.where(HealthAuditModel.account_id == account_uuid)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid account_id format")
+    result = await db.execute(query.limit(1))
+    audit_record = result.scalar_one_or_none()
 
-        result = await db.execute(query.limit(1))
-        audit_record = result.scalar_one_or_none()
+    if not audit_record:
+        raise HTTPException(status_code=404, detail="No audit found")
 
-        # 如果資料庫無資料，返回模擬數據（向後相容）
-        if not audit_record:
-            audit = _generate_mock_audit(default_account_id)
-            return HealthAuditResponse(data=audit)
-
-        # 轉換資料庫記錄為 API 回應格式
-        audit = _convert_db_audit_to_response(audit_record)
-        return HealthAuditResponse(data=audit)
-
-    except Exception as e:
-        # 資料庫連線失敗時，返回模擬數據（提高可用性）
-        import logging
-        logging.warning(f"Database connection failed, returning mock data: {e}")
-        audit = _generate_mock_audit(default_account_id)
-        return HealthAuditResponse(data=audit)
+    # 轉換資料庫記錄為 API 回應格式
+    audit = _convert_db_audit_to_response(audit_record)
+    return HealthAuditResponse(data=audit)
 
 
 @router.get("/audit/{audit_id}", response_model=HealthAuditResponse)
