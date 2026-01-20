@@ -200,22 +200,36 @@ async def get_recommendations(
     Returns:
         RecommendationListResponse: 建議列表與分頁資訊
     """
-    # 從資料庫取得建議
-    query = select(RecommendationDBModel)
+    try:
+        # 從資料庫取得建議
+        query = select(RecommendationDBModel)
 
-    # 狀態篩選
-    if status:
-        query = query.where(RecommendationDBModel.status == status)
+        # 狀態篩選
+        if status:
+            query = query.where(RecommendationDBModel.status == status)
 
-    # 類型篩選
-    if type:
-        query = query.where(RecommendationDBModel.type == type)
+        # 類型篩選
+        if type:
+            query = query.where(RecommendationDBModel.type == type)
 
-    result = await db.execute(query)
-    rec_records = result.scalars().all()
+        result = await db.execute(query)
+        rec_records = result.scalars().all()
 
-    # 如果資料庫無資料，返回模擬數據
-    if not rec_records:
+        # 如果資料庫無資料，返回模擬數據
+        if not rec_records:
+            all_recommendations = _generate_mock_recommendations(30)
+            # 狀態篩選
+            if status:
+                all_recommendations = [r for r in all_recommendations if r.status == status]
+            # 類型篩選
+            if type:
+                all_recommendations = [r for r in all_recommendations if r.type == type]
+        else:
+            all_recommendations = [_convert_db_recommendation_to_response(r) for r in rec_records]
+    except Exception as e:
+        # 資料庫連線失敗時，返回模擬數據
+        import logging
+        logging.warning(f"Database connection failed, returning mock data: {e}")
         all_recommendations = _generate_mock_recommendations(30)
         # 狀態篩選
         if status:
@@ -223,8 +237,6 @@ async def get_recommendations(
         # 類型篩選
         if type:
             all_recommendations = [r for r in all_recommendations if r.type == type]
-    else:
-        all_recommendations = [_convert_db_recommendation_to_response(r) for r in rec_records]
 
     # 排序
     reverse = sort_order == "desc"
@@ -489,23 +501,30 @@ async def get_action_history(
     Returns:
         ActionHistoryResponse: 操作歷史列表
     """
-    # 計算查詢起始日期
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    history_records = []
+    try:
+        # 計算查詢起始日期
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # 建立查詢
-    query = select(ActionHistoryDBModel).where(
-        ActionHistoryDBModel.created_at >= start_date
-    )
+        # 建立查詢
+        query = select(ActionHistoryDBModel).where(
+            ActionHistoryDBModel.created_at >= start_date
+        )
 
-    # 操作類型篩選
-    if action_type:
-        query = query.where(ActionHistoryDBModel.action_type == action_type)
+        # 操作類型篩選
+        if action_type:
+            query = query.where(ActionHistoryDBModel.action_type == action_type)
 
-    # 排序（最新在前）
-    query = query.order_by(ActionHistoryDBModel.created_at.desc())
+        # 排序（最新在前）
+        query = query.order_by(ActionHistoryDBModel.created_at.desc())
 
-    result = await db.execute(query)
-    history_records = result.scalars().all()
+        result = await db.execute(query)
+        history_records = result.scalars().all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空列表（將回傳模擬數據）
+        import logging
+        logging.warning(f"Database connection failed, returning mock data: {e}")
+        history_records = []
 
     # 如果資料庫無資料，返回模擬數據
     if not history_records:

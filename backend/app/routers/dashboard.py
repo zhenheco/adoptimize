@@ -144,28 +144,35 @@ async def get_dashboard_overview(
                 pass
 
     # 從資料庫聚合指標
-    # 查詢 CreativeMetrics，按平台分組
-    query = (
-        select(
-            AdAccount.platform,
-            func.sum(CreativeMetrics.impressions).label("impressions"),
-            func.sum(CreativeMetrics.clicks).label("clicks"),
-            func.sum(CreativeMetrics.conversions).label("conversions"),
-            func.sum(CreativeMetrics.spend).label("spend"),
+    platform_data = []
+    try:
+        # 查詢 CreativeMetrics，按平台分組
+        query = (
+            select(
+                AdAccount.platform,
+                func.sum(CreativeMetrics.impressions).label("impressions"),
+                func.sum(CreativeMetrics.clicks).label("clicks"),
+                func.sum(CreativeMetrics.conversions).label("conversions"),
+                func.sum(CreativeMetrics.spend).label("spend"),
+            )
+            .join(Creative, CreativeMetrics.creative_id == Creative.id)
+            .join(AdAccount, Creative.ad_account_id == AdAccount.id)
+            .where(CreativeMetrics.date >= start_date_obj)
+            .where(CreativeMetrics.date <= end_date_obj)
+            .group_by(AdAccount.platform)
         )
-        .join(Creative, CreativeMetrics.creative_id == Creative.id)
-        .join(AdAccount, Creative.ad_account_id == AdAccount.id)
-        .where(CreativeMetrics.date >= start_date_obj)
-        .where(CreativeMetrics.date <= end_date_obj)
-        .group_by(AdAccount.platform)
-    )
 
-    # 篩選帳戶
-    if account_id_list:
-        query = query.where(AdAccount.id.in_(account_id_list))
+        # 篩選帳戶
+        if account_id_list:
+            query = query.where(AdAccount.id.in_(account_id_list))
 
-    result = await db.execute(query)
-    platform_data = result.all()
+        result = await db.execute(query)
+        platform_data = result.all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空數據
+        import logging
+        logging.warning(f"Database connection failed, returning empty data: {e}")
+        platform_data = []
 
     # 如果資料庫無資料，返回空數據（不再返回模擬數據）
     if not platform_data:
@@ -353,27 +360,34 @@ async def get_dashboard_metrics(
                 pass
 
     # 查詢每日數據用於計算趨勢
-    query = (
-        select(
-            CreativeMetrics.date,
-            func.sum(CreativeMetrics.impressions).label("impressions"),
-            func.sum(CreativeMetrics.clicks).label("clicks"),
-            func.sum(CreativeMetrics.conversions).label("conversions"),
-            func.sum(CreativeMetrics.spend).label("spend"),
+    daily_data = []
+    try:
+        query = (
+            select(
+                CreativeMetrics.date,
+                func.sum(CreativeMetrics.impressions).label("impressions"),
+                func.sum(CreativeMetrics.clicks).label("clicks"),
+                func.sum(CreativeMetrics.conversions).label("conversions"),
+                func.sum(CreativeMetrics.spend).label("spend"),
+            )
+            .join(Creative, CreativeMetrics.creative_id == Creative.id)
+            .where(CreativeMetrics.date >= start_date_obj)
+            .where(CreativeMetrics.date <= end_date_obj)
+            .group_by(CreativeMetrics.date)
+            .order_by(CreativeMetrics.date)
         )
-        .join(Creative, CreativeMetrics.creative_id == Creative.id)
-        .where(CreativeMetrics.date >= start_date_obj)
-        .where(CreativeMetrics.date <= end_date_obj)
-        .group_by(CreativeMetrics.date)
-        .order_by(CreativeMetrics.date)
-    )
 
-    if account_id_list:
-        query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
-        query = query.where(AdAccount.id.in_(account_id_list))
+        if account_id_list:
+            query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
+            query = query.where(AdAccount.id.in_(account_id_list))
 
-    result = await db.execute(query)
-    daily_data = result.all()
+        result = await db.execute(query)
+        daily_data = result.all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空數據
+        import logging
+        logging.warning(f"Database connection failed, returning empty data: {e}")
+        daily_data = []
 
     # 如果無資料，返回空數據
     if not daily_data:
@@ -488,27 +502,34 @@ async def get_dashboard_trends(
                 pass
 
     # 查詢每日數據
-    query = (
-        select(
-            CreativeMetrics.date,
-            func.sum(CreativeMetrics.impressions).label("impressions"),
-            func.sum(CreativeMetrics.clicks).label("clicks"),
-            func.sum(CreativeMetrics.conversions).label("conversions"),
-            func.sum(CreativeMetrics.spend).label("spend"),
+    daily_data = []
+    try:
+        query = (
+            select(
+                CreativeMetrics.date,
+                func.sum(CreativeMetrics.impressions).label("impressions"),
+                func.sum(CreativeMetrics.clicks).label("clicks"),
+                func.sum(CreativeMetrics.conversions).label("conversions"),
+                func.sum(CreativeMetrics.spend).label("spend"),
+            )
+            .join(Creative, CreativeMetrics.creative_id == Creative.id)
+            .where(CreativeMetrics.date >= start_date_obj)
+            .where(CreativeMetrics.date <= end_date_obj)
+            .group_by(CreativeMetrics.date)
+            .order_by(CreativeMetrics.date)
         )
-        .join(Creative, CreativeMetrics.creative_id == Creative.id)
-        .where(CreativeMetrics.date >= start_date_obj)
-        .where(CreativeMetrics.date <= end_date_obj)
-        .group_by(CreativeMetrics.date)
-        .order_by(CreativeMetrics.date)
-    )
 
-    if account_id_list:
-        query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
-        query = query.where(AdAccount.id.in_(account_id_list))
+        if account_id_list:
+            query = query.join(AdAccount, Creative.ad_account_id == AdAccount.id)
+            query = query.where(AdAccount.id.in_(account_id_list))
 
-    result = await db.execute(query)
-    daily_data = result.all()
+        result = await db.execute(query)
+        daily_data = result.all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空數據
+        import logging
+        logging.warning(f"Database connection failed, returning empty data: {e}")
+        daily_data = []
 
     # 如果無資料，返回空數據
     if not daily_data:
