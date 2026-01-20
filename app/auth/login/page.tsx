@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Script from 'next/script'
 import {
   Card,
   CardContent,
@@ -93,8 +94,15 @@ export default function LoginPage() {
       const response = await fetch('/api/v1/auth/oauth/google')
       const data = await response.json()
 
-      if (!response.ok || !data.auth_url) {
-        setError(data.error || '無法啟動 Google 登入')
+      if (!response.ok) {
+        const errorMsg = data.error?.message || data.detail?.message || data.error || '無法啟動 Google 登入'
+        setError(errorMsg)
+        setOauthLoading(null)
+        return
+      }
+
+      if (!data.auth_url) {
+        setError('Google OAuth 設定錯誤，請聯絡管理員')
         setOauthLoading(null)
         return
       }
@@ -102,6 +110,7 @@ export default function LoginPage() {
       // 重定向到 Google OAuth 授權頁面
       window.location.href = data.auth_url
     } catch (err) {
+      console.error('Google 登入錯誤:', err)
       setError('無法連接到伺服器，請稍後再試')
       setOauthLoading(null)
     }
@@ -109,10 +118,63 @@ export default function LoginPage() {
 
   /**
    * 處理 Meta 登入
-   * 目前停用，等待修復 Facebook SDK 問題
+   * 使用 Facebook JavaScript SDK
    */
   const handleMetaLogin = async () => {
-    setError('Meta 登入功能維護中，請使用其他登入方式')
+    setError(null)
+    setOauthLoading('meta')
+
+    try {
+      // 檢查 Facebook SDK 是否已載入
+      if (!(window as any).FB) {
+        setError('Facebook SDK 尚未載入，請重新整理頁面後再試')
+        setOauthLoading(null)
+        return
+      }
+
+      ;(window as any).FB.login(
+        async (response: any) => {
+          if (response.authResponse) {
+            // 使用 access token 登入後端
+            const { accessToken } = response.authResponse
+
+            const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ access_token: accessToken }),
+            })
+
+            const data = await loginResponse.json()
+
+            if (!loginResponse.ok) {
+              const errorMsg = data.error?.message || data.detail?.message || data.error || 'Meta 登入失敗'
+              setError(errorMsg)
+              setOauthLoading(null)
+              return
+            }
+
+            // 存儲 access token 到 localStorage
+            if (data.data?.access_token) {
+              localStorage.setItem('access_token', data.data.access_token)
+              localStorage.setItem('user', JSON.stringify(data.data.user))
+            }
+
+            // 跳轉到 dashboard
+            router.push('/dashboard')
+          } else {
+            setError('Meta 登入取消')
+            setOauthLoading(null)
+          }
+        },
+        { scope: 'email,public_profile' }
+      )
+    } catch (err) {
+      console.error('Meta 登入錯誤:', err)
+      setError('無法連接到伺服器，請稍後再試')
+      setOauthLoading(null)
+    }
   }
 
   // 還未掛載時顯示 loading
@@ -129,7 +191,24 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-md mx-4 shadow-xl">
+    <>
+      {/* Facebook SDK */}
+      <Script
+        src="https://connect.facebook.net/en_US/sdk.js"
+        strategy="afterInteractive"
+        onReady={() => {
+          if ((window as any).FB) {
+            ;(window as any).FB.init({
+              appId: '1336497714898181',
+              cookie: true,
+              xfbml: true,
+              version: 'v18.0',
+            })
+          }
+        }}
+      />
+
+      <Card className="w-full max-w-md mx-4 shadow-xl">
       <CardHeader className="text-center space-y-4">
       {/* Logo */}
       <div className="flex justify-center">
@@ -243,19 +322,19 @@ export default function LoginPage() {
         使用 Google 帳號登入
       </Button>
 
-      {/* Meta 登入按鈕 - 暫時停用 */}
+      {/* Meta 登入按鈕 */}
       <Button
         variant="outline"
         className="w-full h-12 text-base font-medium relative"
         onClick={handleMetaLogin}
-        disabled={true}
+        disabled={isLoading || oauthLoading === 'meta'}
       >
         <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#1877F2">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
           </svg>
         </div>
-        使用 Meta 帳號登入（維護中）
+        使用 Meta 帳號登入
       </Button>
 
       {/* 返回首頁連結 */}
@@ -269,5 +348,6 @@ export default function LoginPage() {
       </div>
     </CardContent>
   </Card>
+    </>
   )
 }
