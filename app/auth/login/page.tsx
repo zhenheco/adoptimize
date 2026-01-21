@@ -89,6 +89,10 @@ export default function LoginPage() {
     }
 
     if (window.FB && typeof window.FB.init === 'function') {
+      // 重要：在 FB.init() 之前就設定標記，防止競態條件
+      // React Strict Mode 可能同時呼叫多次，必須在這裡鎖定
+      window.__fbInitCalled = true
+
       try {
         console.log('正在呼叫 FB.init()...')
         window.FB.init({
@@ -97,10 +101,11 @@ export default function LoginPage() {
           xfbml: true,
           version: 'v18.0',
         })
-        window.__fbInitCalled = true  // 標記為已初始化
         setFbSdkReady(true)
         console.log('Facebook SDK 初始化成功')
       } catch (initError) {
+        // 初始化失敗時重置標記，允許重試
+        window.__fbInitCalled = false
         console.error('Facebook SDK init 失敗:', initError)
       }
     }
