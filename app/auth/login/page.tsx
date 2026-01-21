@@ -50,39 +50,48 @@ declare global {
 }
 
 /**
- * 在模組載入時設定 fbAsyncInit（在 React 組件之外）
- * 這確保 fbAsyncInit 只被設定一次，不受 React Strict Mode 影響
+ * Facebook SDK 初始化（完全在 React 組件之外）
+ *
+ * 重要：這段代碼必須在任何條件下都只執行一次。
+ * 使用 window.__fbAsyncInitSet 來追蹤是否已經設定過。
  */
-if (typeof window !== 'undefined' && !window.__fbInitCalled) {
-  // 初始化回調陣列
-  if (!window.__fbSdkReadyCallbacks) {
-    window.__fbSdkReadyCallbacks = []
-  }
+if (typeof window !== 'undefined') {
+  // 使用 IIFE 確保程式碼邏輯的原子性
+  ;(() => {
+    // 如果已經設定過 fbAsyncInit，完全跳過
+    if ((window as unknown as { __fbAsyncInitSet?: boolean }).__fbAsyncInitSet) {
+      return
+    }
 
-  // 只有在 fbAsyncInit 尚未設定時才設定
-  // 檢查是否已經有我們的初始化函數
-  const existingInit = window.fbAsyncInit
-  if (!existingInit || !(existingInit as unknown as { __isOurInit?: boolean }).__isOurInit) {
-    const initFunction = () => {
+    // 立即標記為已設定，防止競態條件
+    ;(window as unknown as { __fbAsyncInitSet?: boolean }).__fbAsyncInitSet = true
+
+    // 初始化回調陣列
+    if (!window.__fbSdkReadyCallbacks) {
+      window.__fbSdkReadyCallbacks = []
+    }
+
+    // 設定 fbAsyncInit
+    window.fbAsyncInit = () => {
       // 防止多次呼叫
       if (window.__fbInitCalled) {
-        console.log('[模組] fbAsyncInit: 已初始化過，跳過')
+        console.log('[SDK] fbAsyncInit: 已初始化過，跳過')
         return
       }
 
-      // 立即鎖定，防止競態條件
+      // 立即鎖定
       window.__fbInitCalled = true
 
       if (window.FB && typeof window.FB.init === 'function') {
         try {
-          console.log('[模組] fbAsyncInit: 正在呼叫 FB.init()...')
+          console.log('[SDK] fbAsyncInit: 正在呼叫 FB.init()...')
           window.FB.init({
             appId: FB_APP_ID,
             cookie: true,
             xfbml: true,
             version: 'v18.0',
           })
-          console.log('[模組] fbAsyncInit: Facebook SDK 初始化成功')
+          console.log('[SDK] fbAsyncInit: Facebook SDK 初始化成功')
 
           // 通知所有等待的回調
           if (window.__fbSdkReadyCallbacks) {
@@ -91,16 +100,13 @@ if (typeof window !== 'undefined' && !window.__fbInitCalled) {
           }
         } catch (initError) {
           window.__fbInitCalled = false
-          console.error('[模組] fbAsyncInit: Facebook SDK init 失敗:', initError)
+          console.error('[SDK] fbAsyncInit: Facebook SDK init 失敗:', initError)
         }
       }
     }
 
-    // 標記這是我們的初始化函數
-    ;(initFunction as unknown as { __isOurInit?: boolean }).__isOurInit = true
-    window.fbAsyncInit = initFunction
-    console.log('[模組] fbAsyncInit 已設定')
-  }
+    console.log('[SDK] fbAsyncInit 已設定（首次）')
+  })()
 }
 
 /**
