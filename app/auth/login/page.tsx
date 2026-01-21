@@ -134,37 +134,53 @@ export default function LoginPage() {
 
       ;(window as any).FB.login(
         async (response: any) => {
-          if (response.authResponse) {
-            // 使用 access token 登入後端
-            const { accessToken } = response.authResponse
+          try {
+            console.log('FB.login response:', response)
 
-            const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ access_token: accessToken }),
-            })
+            if (response.authResponse) {
+              // 使用 access token 登入後端
+              const { accessToken } = response.authResponse
+              console.log('Got Facebook accessToken, calling backend...')
 
-            const data = await loginResponse.json()
+              const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ access_token: accessToken }),
+              })
 
-            if (!loginResponse.ok) {
-              const errorMsg = data.error?.message || data.detail?.message || data.error || 'Meta 登入失敗'
-              setError(errorMsg)
+              console.log('Backend response status:', loginResponse.status)
+              const data = await loginResponse.json()
+              console.log('Backend response data:', data)
+
+              if (!loginResponse.ok) {
+                const errorMsg = data.error?.message || data.detail?.message || data.error || 'Meta 登入失敗'
+                setError(errorMsg)
+                setOauthLoading(null)
+                return
+              }
+
+              // 存儲 access token 到 localStorage
+              if (data.data?.access_token) {
+                localStorage.setItem('access_token', data.data.access_token)
+                localStorage.setItem('user', JSON.stringify(data.data.user))
+              }
+
+              // 跳轉到 dashboard
+              router.push('/dashboard')
+            } else if (response.status === 'not_authorized') {
+              // 用戶沒有授權 App
+              setError('請授權應用程式以繼續登入')
               setOauthLoading(null)
-              return
+            } else {
+              // 用戶取消登入或沒有登入 Facebook
+              setError('Meta 登入取消')
+              setOauthLoading(null)
             }
-
-            // 存儲 access token 到 localStorage
-            if (data.data?.access_token) {
-              localStorage.setItem('access_token', data.data.access_token)
-              localStorage.setItem('user', JSON.stringify(data.data.user))
-            }
-
-            // 跳轉到 dashboard
-            router.push('/dashboard')
-          } else {
-            setError('Meta 登入取消')
+          } catch (callbackErr) {
+            console.error('FB.login callback error:', callbackErr)
+            setError('Meta 登入處理失敗，請重試')
             setOauthLoading(null)
           }
         },
