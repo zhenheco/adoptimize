@@ -97,10 +97,19 @@ export function useAudiences(
       const response = await fetch(`/api/v1/audiences?${params}`);
 
       if (!response.ok) {
-        throw new Error(`API 請求失敗: ${response.status}`);
+        // 嘗試解析錯誤訊息
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData?.error?.message || errorData?.detail || `API 請求失敗: ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const result: ApiResponse<Audience[]> = await response.json();
+
+      // 確保 data 是陣列
+      if (!Array.isArray(result.data)) {
+        throw new Error('API 返回的資料格式不正確');
+      }
+
       setAudiences(result.data);
       setPagination({
         page: result.meta?.page || 1,
