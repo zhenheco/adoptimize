@@ -17,6 +17,10 @@ import { Input } from '@/components/ui/input'
 // Facebook App ID
 const FB_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || '1336497714898181'
 
+// 模組級變數，確保 FB.init() 只被呼叫一次
+// （React Strict Mode 會導致組件重新渲染，但這個變數會保持不變）
+let fbInitCalled = false
+
 // 聲明 FB SDK 全域類型
 declare global {
   interface Window {
@@ -65,9 +69,16 @@ export default function LoginPage() {
 
   /**
    * 初始化 Facebook SDK
-   * 必須確保 FB 物件存在且是完整載入的狀態
+   * 使用模組級變數確保 FB.init() 只被呼叫一次
    */
   const initFacebookSdk = useCallback(() => {
+    // 如果已經初始化過，直接更新 state 並返回
+    if (fbInitCalled) {
+      console.log('Facebook SDK 已經初始化過了（跳過重複呼叫）')
+      setFbSdkReady(true)
+      return
+    }
+
     if (window.FB && typeof window.FB.init === 'function') {
       try {
         window.FB.init({
@@ -76,8 +87,9 @@ export default function LoginPage() {
           xfbml: true,
           version: 'v18.0',
         })
+        fbInitCalled = true  // 標記為已初始化
         setFbSdkReady(true)
-        console.log('Facebook SDK 已初始化')
+        console.log('Facebook SDK 初始化成功')
       } catch (initError) {
         console.error('Facebook SDK init 失敗:', initError)
       }
@@ -210,17 +222,19 @@ export default function LoginPage() {
     }
 
     // 如果 SDK 還沒初始化，先初始化
-    if (!fbSdkReady) {
+    // 使用模組級變數 fbInitCalled 來確認是否真的初始化過
+    if (!fbInitCalled) {
       try {
-        console.log('嘗試初始化 Facebook SDK...')
+        console.log('handleMetaLogin: 嘗試初始化 Facebook SDK...')
         window.FB.init({
           appId: FB_APP_ID,
           cookie: true,
           xfbml: true,
           version: 'v18.0',
         })
+        fbInitCalled = true
         setFbSdkReady(true)
-        console.log('Facebook SDK 初始化成功')
+        console.log('handleMetaLogin: Facebook SDK 初始化成功')
       } catch (initErr) {
         console.error('Facebook SDK 初始化失敗:', initErr)
         setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
