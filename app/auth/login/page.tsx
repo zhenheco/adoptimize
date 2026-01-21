@@ -51,34 +51,38 @@ declare global {
 /**
  * 初始化 Facebook SDK 的函數
  * 多重防護確保只初始化一次：
- * 1. 檢查 window.FB 是否存在
- * 2. 檢查 script 元素是否存在
- * 3. 檢查 __fbInitCalled 標記
+ * 1. 檢查 sessionStorage 標記（跨重新渲染持久）
+ * 2. 檢查 window.FB 是否存在
+ * 3. 檢查 script 元素是否存在
  */
 function initializeFacebookSdk(appId: string, onReady: () => void): void {
+  const FB_INIT_KEY = 'fb_sdk_initialized'
+
   // 第一步：如果 FB SDK 已經載入並初始化，直接觸發回調
-  if (window.FB && window.__fbInitCalled) {
-    console.log('[initFB] SDK 已初始化，直接觸發回調')
-    onReady()
-    return
+  if (window.FB) {
+    const isInitialized = sessionStorage.getItem(FB_INIT_KEY) === 'true'
+    if (isInitialized) {
+      console.log('[initFB] SDK 已初始化（sessionStorage），直接觸發回調')
+      window.__fbInitCalled = true
+      onReady()
+      return
+    } else {
+      // FB 物件存在但沒有初始化標記，手動初始化
+      console.log('[initFB] SDK 已載入但未初始化，手動初始化')
+      window.FB.init({
+        appId: appId,
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0',
+      })
+      window.__fbInitCalled = true
+      sessionStorage.setItem(FB_INIT_KEY, 'true')
+      onReady()
+      return
+    }
   }
 
-  // 第二步：如果 FB 物件存在但尚未初始化，這是異常狀態
-  // 可能是 SDK 載入了但 fbAsyncInit 被覆蓋
-  if (window.FB && !window.__fbInitCalled) {
-    console.log('[initFB] SDK 已載入但未初始化，手動初始化')
-    window.FB.init({
-      appId: appId,
-      cookie: true,
-      xfbml: true,
-      version: 'v18.0',
-    })
-    window.__fbInitCalled = true
-    onReady()
-    return
-  }
-
-  // 第三步：檢查 script 標籤是否已存在
+  // 第二步：檢查 script 標籤是否已存在
   const existingScript = document.getElementById('facebook-jssdk')
   if (existingScript) {
     // Script 已存在但 FB 物件不存在，表示正在載入中
@@ -90,6 +94,13 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
     return
   }
 
+  // 第三步：檢查 sessionStorage 是否有初始化標記但 FB 不存在
+  // 這種情況可能發生在頁面重新載入時
+  if (sessionStorage.getItem(FB_INIT_KEY) === 'true') {
+    console.log('[initFB] sessionStorage 顯示已初始化但 FB 不存在，清除標記重新載入')
+    sessionStorage.removeItem(FB_INIT_KEY)
+  }
+
   // 首次載入 - 初始化回調陣列
   console.log('[initFB] 首次載入，開始初始化流程')
   window.__fbSdkReadyCallbacks = [onReady]
@@ -99,8 +110,12 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
     console.log('[initFB] fbAsyncInit 被呼叫')
 
     // 再次檢查是否已初始化（防止競態條件）
-    if (window.__fbInitCalled) {
+    if (window.__fbInitCalled || sessionStorage.getItem(FB_INIT_KEY) === 'true') {
       console.log('[initFB] 已初始化，跳過')
+      // 確保回調被觸發
+      const callbacks = window.__fbSdkReadyCallbacks || []
+      window.__fbSdkReadyCallbacks = []
+      callbacks.forEach(cb => cb())
       return
     }
 
@@ -112,8 +127,9 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
       version: 'v18.0',
     })
 
-    // 標記已初始化
+    // 標記已初始化（雙重標記）
     window.__fbInitCalled = true
+    sessionStorage.setItem(FB_INIT_KEY, 'true')
     console.log('[initFB] FB.init() 成功')
 
     // 觸發所有等待中的回調
