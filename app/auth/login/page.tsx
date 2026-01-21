@@ -50,26 +50,43 @@ declare global {
 
 /**
  * 初始化 Facebook SDK 的函數
- * 使用 script 元素作為單一事實來源，確保只初始化一次
+ * 多重防護確保只初始化一次：
+ * 1. 檢查 window.FB 是否存在
+ * 2. 檢查 script 元素是否存在
+ * 3. 檢查 __fbInitCalled 標記
  */
 function initializeFacebookSdk(appId: string, onReady: () => void): void {
-  // 第一步：檢查 script 標籤是否已存在（最可靠的檢查方式）
-  const existingScript = document.getElementById('facebook-jssdk')
+  // 第一步：如果 FB SDK 已經載入並初始化，直接觸發回調
+  if (window.FB && window.__fbInitCalled) {
+    console.log('[initFB] SDK 已初始化，直接觸發回調')
+    onReady()
+    return
+  }
 
+  // 第二步：如果 FB 物件存在但尚未初始化，這是異常狀態
+  // 可能是 SDK 載入了但 fbAsyncInit 被覆蓋
+  if (window.FB && !window.__fbInitCalled) {
+    console.log('[initFB] SDK 已載入但未初始化，手動初始化')
+    window.FB.init({
+      appId: appId,
+      cookie: true,
+      xfbml: true,
+      version: 'v18.0',
+    })
+    window.__fbInitCalled = true
+    onReady()
+    return
+  }
+
+  // 第三步：檢查 script 標籤是否已存在
+  const existingScript = document.getElementById('facebook-jssdk')
   if (existingScript) {
-    // Script 已存在，SDK 可能已經載入或正在載入
-    if (window.FB && window.__fbInitCalled) {
-      // SDK 已初始化完成，直接觸發回調
-      console.log('[initFB] SDK 已初始化，直接觸發回調')
-      onReady()
-    } else {
-      // SDK 正在載入，添加回調等待
-      console.log('[initFB] SDK 正在載入，添加回調等待')
-      if (!window.__fbSdkReadyCallbacks) {
-        window.__fbSdkReadyCallbacks = []
-      }
-      window.__fbSdkReadyCallbacks.push(onReady)
+    // Script 已存在但 FB 物件不存在，表示正在載入中
+    console.log('[initFB] Script 存在，SDK 正在載入，添加回調等待')
+    if (!window.__fbSdkReadyCallbacks) {
+      window.__fbSdkReadyCallbacks = []
     }
+    window.__fbSdkReadyCallbacks.push(onReady)
     return
   }
 
@@ -78,9 +95,14 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
   window.__fbSdkReadyCallbacks = [onReady]
 
   // 設定 fbAsyncInit（Facebook SDK 載入後會自動呼叫）
-  // 這個函數只會被 FB SDK 呼叫一次
   window.fbAsyncInit = function() {
     console.log('[initFB] fbAsyncInit 被呼叫')
+
+    // 再次檢查是否已初始化（防止競態條件）
+    if (window.__fbInitCalled) {
+      console.log('[initFB] 已初始化，跳過')
+      return
+    }
 
     // 呼叫 FB.init()
     window.FB!.init({
@@ -101,14 +123,14 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
     callbacks.forEach(cb => cb())
   }
 
-  // 載入 Facebook SDK script（只會執行一次，因為上面已經檢查過 script 不存在）
+  // 載入 Facebook SDK script 到 head（比 body 更穩定）
   console.log('[initFB] 建立並載入 SDK script')
   const script = document.createElement('script')
   script.id = 'facebook-jssdk'
   script.src = 'https://connect.facebook.net/en_US/sdk.js'
   script.async = true
   script.defer = true
-  document.body.appendChild(script)
+  document.head.appendChild(script)
 }
 
 /**
