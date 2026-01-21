@@ -49,104 +49,92 @@ declare global {
 }
 
 /**
- * 初始化 Facebook SDK 的函數
- * 多重防護確保只初始化一次：
- * 1. 檢查 sessionStorage 標記（跨重新渲染持久）
- * 2. 檢查 window.FB 是否存在
- * 3. 檢查 script 元素是否存在
+ * 載入 Facebook SDK script（不初始化）
+ * 返回 Promise，在 SDK 載入完成後 resolve
  */
-function initializeFacebookSdk(appId: string, onReady: () => void): void {
-  const FB_INIT_KEY = 'fb_sdk_initialized'
-
-  // 第一步：如果 FB SDK 已經載入並初始化，直接觸發回調
-  if (window.FB) {
-    const isInitialized = sessionStorage.getItem(FB_INIT_KEY) === 'true'
-    if (isInitialized) {
-      console.log('[initFB] SDK 已初始化（sessionStorage），直接觸發回調')
-      window.__fbInitCalled = true
-      onReady()
-      return
-    } else {
-      // FB 物件存在但沒有初始化標記，手動初始化
-      console.log('[initFB] SDK 已載入但未初始化，手動初始化')
-      window.FB.init({
-        appId: appId,
-        cookie: true,
-        xfbml: true,
-        version: 'v18.0',
-      })
-      window.__fbInitCalled = true
-      sessionStorage.setItem(FB_INIT_KEY, 'true')
-      onReady()
-      return
-    }
-  }
-
-  // 第二步：檢查 script 標籤是否已存在
-  const existingScript = document.getElementById('facebook-jssdk')
-  if (existingScript) {
-    // Script 已存在但 FB 物件不存在，表示正在載入中
-    console.log('[initFB] Script 存在，SDK 正在載入，添加回調等待')
-    if (!window.__fbSdkReadyCallbacks) {
-      window.__fbSdkReadyCallbacks = []
-    }
-    window.__fbSdkReadyCallbacks.push(onReady)
-    return
-  }
-
-  // 第三步：檢查 sessionStorage 是否有初始化標記但 FB 不存在
-  // 這種情況可能發生在頁面重新載入時
-  if (sessionStorage.getItem(FB_INIT_KEY) === 'true') {
-    console.log('[initFB] sessionStorage 顯示已初始化但 FB 不存在，清除標記重新載入')
-    sessionStorage.removeItem(FB_INIT_KEY)
-  }
-
-  // 首次載入 - 初始化回調陣列
-  console.log('[initFB] 首次載入，開始初始化流程')
-  window.__fbSdkReadyCallbacks = [onReady]
-
-  // 設定 fbAsyncInit（Facebook SDK 載入後會自動呼叫）
-  window.fbAsyncInit = function() {
-    console.log('[initFB] fbAsyncInit 被呼叫')
-
-    // 再次檢查是否已初始化（防止競態條件）
-    if (window.__fbInitCalled || sessionStorage.getItem(FB_INIT_KEY) === 'true') {
-      console.log('[initFB] 已初始化，跳過')
-      // 確保回調被觸發
-      const callbacks = window.__fbSdkReadyCallbacks || []
-      window.__fbSdkReadyCallbacks = []
-      callbacks.forEach(cb => cb())
+function loadFacebookSdk(): Promise<void> {
+  return new Promise((resolve) => {
+    // 如果 FB 已經存在，直接返回
+    if (window.FB) {
+      console.log('[loadFB] SDK 已載入')
+      resolve()
       return
     }
 
-    // 呼叫 FB.init()
-    window.FB!.init({
+    // 如果 script 已經在載入中，等待載入完成
+    const existingScript = document.getElementById('facebook-jssdk')
+    if (existingScript) {
+      console.log('[loadFB] Script 已存在，等待載入')
+      // 輪詢等待 FB 物件
+      const checkFB = setInterval(() => {
+        if (window.FB) {
+          clearInterval(checkFB)
+          resolve()
+        }
+      }, 100)
+      // 10 秒超時
+      setTimeout(() => {
+        clearInterval(checkFB)
+        resolve()
+      }, 10000)
+      return
+    }
+
+    // 設定 fbAsyncInit（SDK 載入後會自動呼叫，但我們不在這裡初始化）
+    window.fbAsyncInit = function() {
+      console.log('[loadFB] fbAsyncInit 被呼叫（不初始化）')
+      resolve()
+    }
+
+    // 載入 SDK script
+    console.log('[loadFB] 載入 SDK script')
+    const script = document.createElement('script')
+    script.id = 'facebook-jssdk'
+    script.src = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
+    script.defer = true
+    document.head.appendChild(script)
+  })
+}
+
+/**
+ * 初始化 Facebook SDK（在用戶點擊登入按鈕時呼叫）
+ * 確保在同一個 JS 上下文中載入和初始化
+ */
+async function ensureFacebookSdkReady(appId: string): Promise<boolean> {
+  console.log('[ensureFB] 開始確保 SDK 就緒')
+
+  // 載入 SDK
+  await loadFacebookSdk()
+
+  // 檢查 FB 是否存在
+  if (!window.FB) {
+    console.error('[ensureFB] SDK 載入失敗，FB 物件不存在')
+    return false
+  }
+
+  // 如果已經初始化過，直接返回成功
+  if (window.__fbInitCalled) {
+    console.log('[ensureFB] SDK 已初始化')
+    return true
+  }
+
+  // 初始化 SDK
+  try {
+    console.log('[ensureFB] 呼叫 FB.init()')
+    window.FB.init({
       appId: appId,
       cookie: true,
       xfbml: true,
       version: 'v18.0',
     })
-
-    // 標記已初始化（雙重標記）
     window.__fbInitCalled = true
-    sessionStorage.setItem(FB_INIT_KEY, 'true')
-    console.log('[initFB] FB.init() 成功')
-
-    // 觸發所有等待中的回調
-    const callbacks = window.__fbSdkReadyCallbacks || []
-    window.__fbSdkReadyCallbacks = []
-    console.log(`[initFB] 觸發 ${callbacks.length} 個回調`)
-    callbacks.forEach(cb => cb())
+    console.log('[ensureFB] FB.init() 成功')
+    return true
+  } catch (err) {
+    console.error('[ensureFB] FB.init() 失敗', err)
+    return false
   }
-
-  // 載入 Facebook SDK script 到 head（比 body 更穩定）
-  console.log('[initFB] 建立並載入 SDK script')
-  const script = document.createElement('script')
-  script.id = 'facebook-jssdk'
-  script.src = 'https://connect.facebook.net/en_US/sdk.js'
-  script.async = true
-  script.defer = true
-  document.head.appendChild(script)
 }
 
 /**
@@ -174,7 +162,7 @@ export default function LoginPage() {
     return window.__fbInitCalled === true && !!window.FB
   }, [])
 
-  // 確保組件已掛載並初始化 Facebook SDK
+  // 確保組件已掛載，並預載 Facebook SDK（但不初始化）
   useEffect(() => {
     setMounted(true)
 
@@ -185,11 +173,11 @@ export default function LoginPage() {
       setError(decodeURIComponent(urlError))
     }
 
-    // 初始化 Facebook SDK
-    console.log('[組件] useEffect: 開始初始化 Facebook SDK')
-    initializeFacebookSdk(FB_APP_ID, () => {
-      console.log('[組件] Facebook SDK 就緒回調')
-      setFbSdkReady(true)
+    // 預載 Facebook SDK（不初始化，初始化將在用戶點擊按鈕時進行）
+    console.log('[組件] useEffect: 預載 Facebook SDK')
+    loadFacebookSdk().then(() => {
+      console.log('[組件] Facebook SDK 預載完成')
+      // 不設置 fbSdkReady，因為還沒有初始化
     })
   }, []) // 空依賴陣列，只執行一次
 
@@ -275,51 +263,25 @@ export default function LoginPage() {
     setError(null)
     setOauthLoading('meta')
 
-    // 調試日誌
-    console.log('[組件] handleMetaLogin 開始', {
-      fbExists: !!window.FB,
-      __fbInitCalled: window.__fbInitCalled,
-      isFbInitialized: isFbInitialized(),
-      fbSdkReady
-    })
-
     // 檢查是否在 HTTPS 環境（Facebook SDK 要求）
     if (typeof window !== 'undefined' && window.location.protocol !== 'https:') {
-      // 本地開發環境不支援 FB.login，顯示提示訊息
       setError('Meta 登入需要 HTTPS 環境。請使用正式網站登入，或使用 Google 帳號登入。')
       setOauthLoading(null)
       return
     }
 
-    // 檢查 Facebook SDK 是否可用
-    if (!window.FB) {
-      setError('Facebook SDK 尚未載入，請稍候或重新整理頁面')
+    // 確保 SDK 已載入並初始化（延遲初始化策略）
+    console.log('[組件] handleMetaLogin: 確保 SDK 就緒')
+    const sdkReady = await ensureFacebookSdkReady(FB_APP_ID)
+
+    if (!sdkReady || !window.FB) {
+      console.error('[組件] handleMetaLogin: SDK 未就緒')
+      setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
       setOauthLoading(null)
       return
     }
 
-    // 如果 SDK 存在但未正確初始化，嘗試修復
-    if (!isFbInitialized()) {
-      console.log('[組件] handleMetaLogin: SDK 存在但未初始化，嘗試手動初始化')
-      try {
-        window.FB.init({
-          appId: FB_APP_ID,
-          cookie: true,
-          xfbml: true,
-          version: 'v18.0',
-        })
-        window.__fbInitCalled = true
-        sessionStorage.setItem('fb_sdk_initialized', 'true')
-        console.log('[組件] handleMetaLogin: 手動初始化成功')
-      } catch (initErr) {
-        console.error('[組件] handleMetaLogin: 手動初始化失敗', initErr)
-        setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
-        setOauthLoading(null)
-        return
-      }
-    }
-
-    console.log('[組件] handleMetaLogin: 即將呼叫 FB.login()')
+    console.log('[組件] handleMetaLogin: SDK 就緒，呼叫 FB.login()')
 
     try {
       window.FB.login(
