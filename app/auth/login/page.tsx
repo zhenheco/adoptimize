@@ -113,14 +113,18 @@ export default function LoginPage() {
       initFacebookSdk()
     }
 
-    // 注意：不要在這裡檢查 window.FB 並直接初始化
-    // 因為 FB 物件可能存在但還沒完全準備好
-    // 應該等待 fbAsyncInit 被呼叫
-
-    return () => {
-      // 清理
-      window.fbAsyncInit = undefined
+    // 如果 FB SDK 已經載入但尚未初始化，手動初始化
+    // 這處理 script 在 useEffect 之前載入的情況
+    if (window.FB && !window.__fbInitCalled) {
+      console.log('useEffect: FB 已載入但未初始化，手動呼叫 initFacebookSdk')
+      initFacebookSdk()
+    } else if (window.__fbInitCalled) {
+      console.log('useEffect: FB 已初始化，更新 state')
+      setFbSdkReady(true)
     }
+
+    // 不要在 cleanup 中清除 fbAsyncInit，因為 Strict Mode 會導致多次呼叫
+    // 清除會導致競態條件
   }, [initFacebookSdk])
 
   /**
@@ -384,13 +388,11 @@ export default function LoginPage() {
         strategy="afterInteractive"
         onLoad={() => {
           console.log('Facebook SDK script loaded')
-          // 使用 window.__fbInitCalled 而非 React state 來判斷是否已初始化
-          // React state 可能在組件重渲染時被重置
-          if (window.FB && !window.__fbInitCalled) {
-            console.log('手動初始化 Facebook SDK（fbAsyncInit 可能已錯過）')
-            initFacebookSdk()
-          } else if (window.__fbInitCalled) {
-            console.log('Script onLoad: SDK 已初始化，跳過')
+          // 不要在這裡呼叫 initFacebookSdk()
+          // 讓 fbAsyncInit 處理初始化（官方推薦方式）
+          // 只更新 React state 表示 SDK 已載入
+          if (window.__fbInitCalled) {
+            console.log('Script onLoad: SDK 已由 fbAsyncInit 初始化')
             setFbSdkReady(true)
           }
         }}
