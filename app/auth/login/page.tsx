@@ -231,98 +231,25 @@ export default function LoginPage() {
 
     try {
       window.FB.login(
-        async (response) => {
-          try {
-            console.log('FB.login response:', response)
+        (response) => {
+          // 注意：FB.login callback 不能是 async function
+          // 所以我們在裡面呼叫一個 async 函數
+          console.log('FB.login response:', response)
 
-            if (response.authResponse) {
-              // 使用 access token 登入後端
-              const { accessToken } = response.authResponse
-              console.log('Got Facebook accessToken, calling backend...')
+          if (response.authResponse) {
+            // 使用 access token 登入後端
+            const { accessToken } = response.authResponse
+            console.log('Got Facebook accessToken, calling backend...')
 
-              // 使用 AbortController 設定 15 秒 timeout
-              const controller = new AbortController()
-              const timeoutId = setTimeout(() => controller.abort(), 15000)
-
-              try {
-                const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ access_token: accessToken }),
-                  signal: controller.signal,
-                })
-
-                clearTimeout(timeoutId)
-
-                console.log('Backend response status:', loginResponse.status)
-
-                // 檢查 content-type 是否為 JSON
-                const contentType = loginResponse.headers.get('content-type')
-                if (!contentType || !contentType.includes('application/json')) {
-                  console.error('Unexpected content-type:', contentType)
-                  setError('伺服器回應格式錯誤，可能是 CORS 或配置問題')
-                  setOauthLoading(null)
-                  return
-                }
-
-                const data = await loginResponse.json()
-                console.log('Backend response data:', data)
-
-                if (!loginResponse.ok) {
-                  // 區分不同錯誤類型
-                  let errorMsg = 'Meta 登入失敗'
-
-                  if (loginResponse.status === 500) {
-                    // 伺服器錯誤 - 可能是配置問題
-                    errorMsg = data.detail || '伺服器內部錯誤，請檢查 META_APP_SECRET 是否已配置'
-                  } else if (loginResponse.status === 401 || loginResponse.status === 403) {
-                    // 授權錯誤
-                    errorMsg = data.detail || 'Meta 授權失敗，請重試'
-                  } else if (loginResponse.status === 400) {
-                    // 請求錯誤
-                    errorMsg = data.detail || '無效的請求，請重新登入'
-                  } else {
-                    errorMsg = data.error?.message || data.detail?.message || data.detail || data.error || errorMsg
-                  }
-
-                  setError(errorMsg)
-                  setOauthLoading(null)
-                  return
-                }
-
-                // 存儲 access token 到 localStorage
-                if (data.data?.access_token) {
-                  localStorage.setItem('access_token', data.data.access_token)
-                  localStorage.setItem('user', JSON.stringify(data.data.user))
-                }
-
-                // 跳轉到 dashboard
-                router.push('/dashboard')
-              } catch (fetchErr: unknown) {
-                clearTimeout(timeoutId)
-
-                if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-                  setError('連線逾時，請檢查網路連線後重試')
-                } else {
-                  console.error('Fetch error:', fetchErr)
-                  setError('無法連接到伺服器，請檢查網路連線')
-                }
-                setOauthLoading(null)
-              }
-            } else if (response.status === 'not_authorized') {
-              // 用戶沒有授權 App
-              setError('請授權應用程式以繼續登入')
-              setOauthLoading(null)
-            } else {
-              // 用戶取消登入或沒有登入 Facebook
-              setError('Meta 登入已取消')
-              setOauthLoading(null)
-            }
-          } catch (callbackErr) {
-            console.error('FB.login callback error:', callbackErr)
-            setError('Meta 登入處理失敗，請重試')
+            // 呼叫 async 處理函數
+            handleFacebookLoginSuccess(accessToken)
+          } else if (response.status === 'not_authorized') {
+            // 用戶沒有授權 App
+            setError('請授權應用程式以繼續登入')
+            setOauthLoading(null)
+          } else {
+            // 用戶取消登入或沒有登入 Facebook
+            setError('Meta 登入已取消')
             setOauthLoading(null)
           }
         },
@@ -339,6 +266,83 @@ export default function LoginPage() {
         setError('彈窗被瀏覽器阻擋，請允許彈窗後重試')
       } else {
         setError('Meta 登入失敗：' + errorMessage)
+      }
+      setOauthLoading(null)
+    }
+  }
+
+  /**
+   * 處理 Facebook 登入成功後的後端驗證
+   */
+  const handleFacebookLoginSuccess = async (accessToken: string) => {
+    // 使用 AbortController 設定 15 秒 timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+    try {
+      const loginResponse = await fetch('/api/v1/auth/oauth/meta/sdk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ access_token: accessToken }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      console.log('Backend response status:', loginResponse.status)
+
+      // 檢查 content-type 是否為 JSON
+      const contentType = loginResponse.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Unexpected content-type:', contentType)
+        setError('伺服器回應格式錯誤，可能是 CORS 或配置問題')
+        setOauthLoading(null)
+        return
+      }
+
+      const data = await loginResponse.json()
+      console.log('Backend response data:', data)
+
+      if (!loginResponse.ok) {
+        // 區分不同錯誤類型
+        let errorMsg = 'Meta 登入失敗'
+
+        if (loginResponse.status === 500) {
+          // 伺服器錯誤 - 可能是配置問題
+          errorMsg = data.detail || '伺服器內部錯誤，請檢查 META_APP_SECRET 是否已配置'
+        } else if (loginResponse.status === 401 || loginResponse.status === 403) {
+          // 授權錯誤
+          errorMsg = data.detail || 'Meta 授權失敗，請重試'
+        } else if (loginResponse.status === 400) {
+          // 請求錯誤
+          errorMsg = data.detail || '無效的請求，請重新登入'
+        } else {
+          errorMsg = data.error?.message || data.detail?.message || data.detail || data.error || errorMsg
+        }
+
+        setError(errorMsg)
+        setOauthLoading(null)
+        return
+      }
+
+      // 存儲 access token 到 localStorage
+      if (data.data?.access_token) {
+        localStorage.setItem('access_token', data.data.access_token)
+        localStorage.setItem('user', JSON.stringify(data.data.user))
+      }
+
+      // 跳轉到 dashboard
+      router.push('/dashboard')
+    } catch (fetchErr: unknown) {
+      clearTimeout(timeoutId)
+
+      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+        setError('連線逾時，請檢查網路連線後重試')
+      } else {
+        console.error('Fetch error:', fetchErr)
+        setError('無法連接到伺服器，請檢查網路連線')
       }
       setOauthLoading(null)
     }
