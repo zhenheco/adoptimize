@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Script from 'next/script'
@@ -14,13 +14,44 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+// Facebook App ID
+const FB_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || '1336497714898181'
+
+// 聲明 FB SDK 全域類型
+declare global {
+  interface Window {
+    FB?: {
+      init: (params: {
+        appId: string
+        cookie?: boolean
+        xfbml?: boolean
+        version: string
+      }) => void
+      login: (
+        callback: (response: {
+          authResponse?: { accessToken: string }
+          status?: string
+        }) => void,
+        options?: { scope: string }
+      ) => void
+      getLoginStatus: (
+        callback: (response: {
+          status: string
+          authResponse?: { accessToken: string }
+        }) => void
+      ) => void
+    }
+    fbAsyncInit?: () => void
+  }
+}
+
 /**
  * 登入頁面
  *
  * 支援：
  * - Email/密碼登入
  * - Google OAuth 登入
- * - Meta OAuth 登入（目前停用）
+ * - Meta OAuth 登入
  */
 export default function LoginPage() {
   const router = useRouter()
@@ -30,6 +61,24 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'meta' | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [fbSdkReady, setFbSdkReady] = useState(false)
+
+  /**
+   * 初始化 Facebook SDK
+   */
+  const initFacebookSdk = useCallback(() => {
+    if (window.FB) {
+      // SDK 已載入，直接初始化
+      window.FB.init({
+        appId: FB_APP_ID,
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0',
+      })
+      setFbSdkReady(true)
+      console.log('Facebook SDK 已初始化')
+    }
+  }, [])
 
   // 確保組件已掛載（客戶端渲染完成）
   useEffect(() => {
@@ -41,7 +90,22 @@ export default function LoginPage() {
     if (urlError) {
       setError(decodeURIComponent(urlError))
     }
-  }, [])
+
+    // 設定 fbAsyncInit，當 SDK 載入完成時會自動呼叫
+    window.fbAsyncInit = () => {
+      initFacebookSdk()
+    }
+
+    // 如果 FB SDK 已經載入（例如從快取），直接初始化
+    if (window.FB) {
+      initFacebookSdk()
+    }
+
+    return () => {
+      // 清理
+      window.fbAsyncInit = undefined
+    }
+  }, [initFacebookSdk])
 
   /**
    * 處理 Email/密碼登入
@@ -119,21 +183,49 @@ export default function LoginPage() {
   /**
    * 處理 Meta 登入
    * 使用 Facebook JavaScript SDK
+   * 注意：FB.login 只能在 HTTPS 頁面上使用
    */
   const handleMetaLogin = async () => {
     setError(null)
     setOauthLoading('meta')
 
-    try {
-      // 檢查 Facebook SDK 是否已載入
-      if (!(window as any).FB) {
-        setError('Facebook SDK 尚未載入，請重新整理頁面後再試')
+    // 檢查是否在 HTTPS 環境（Facebook SDK 要求）
+    if (typeof window !== 'undefined' && window.location.protocol !== 'https:') {
+      // 本地開發環境不支援 FB.login，顯示提示訊息
+      setError('Meta 登入需要 HTTPS 環境。請使用正式網站登入，或使用 Google 帳號登入。')
+      setOauthLoading(null)
+      return
+    }
+
+    // 檢查 Facebook SDK 是否已初始化
+    if (!fbSdkReady || !window.FB) {
+      // 嘗試重新初始化
+      if (window.FB) {
+        try {
+          window.FB.init({
+            appId: FB_APP_ID,
+            cookie: true,
+            xfbml: true,
+            version: 'v18.0',
+          })
+          setFbSdkReady(true)
+          console.log('Facebook SDK 重新初始化成功')
+        } catch (initErr) {
+          console.error('Facebook SDK 初始化失敗:', initErr)
+          setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
+          setOauthLoading(null)
+          return
+        }
+      } else {
+        setError('Facebook SDK 尚未載入，請稍候或重新整理頁面')
         setOauthLoading(null)
         return
       }
+    }
 
-      ;(window as any).FB.login(
-        async (response: any) => {
+    try {
+      window.FB.login(
+        async (response) => {
           try {
             console.log('FB.login response:', response)
 
@@ -202,10 +294,10 @@ export default function LoginPage() {
 
                 // 跳轉到 dashboard
                 router.push('/dashboard')
-              } catch (fetchErr: any) {
+              } catch (fetchErr: unknown) {
                 clearTimeout(timeoutId)
 
-                if (fetchErr.name === 'AbortError') {
+                if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
                   setError('連線逾時，請檢查網路連線後重試')
                 } else {
                   console.error('Fetch error:', fetchErr)
@@ -232,7 +324,7 @@ export default function LoginPage() {
       )
     } catch (err) {
       console.error('Meta 登入錯誤:', err)
-      setError('Facebook SDK 初始化失敗，請重新整理頁面')
+      setError('Facebook SDK 載入異常，請重新整理頁面後再試')
       setOauthLoading(null)
     }
   }
@@ -252,19 +344,19 @@ export default function LoginPage() {
 
   return (
     <>
-      {/* Facebook SDK */}
+      {/* Facebook SDK - 使用 async 載入方式 */}
       <Script
         src="https://connect.facebook.net/en_US/sdk.js"
         strategy="afterInteractive"
-        onReady={() => {
-          if ((window as any).FB) {
-            ;(window as any).FB.init({
-              appId: '1336497714898181',
-              cookie: true,
-              xfbml: true,
-              version: 'v18.0',
-            })
+        onLoad={() => {
+          console.log('Facebook SDK script loaded')
+          // Script 載入後，檢查 FB 是否可用
+          if (window.FB && !fbSdkReady) {
+            initFacebookSdk()
           }
+        }}
+        onError={(e) => {
+          console.error('Facebook SDK 載入失敗:', e)
         }}
       />
 
