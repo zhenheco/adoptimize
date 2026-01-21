@@ -322,9 +322,18 @@ export default function LoginPage() {
         },
         { scope: 'email,public_profile' }
       )
-    } catch (err) {
+    } catch (err: unknown) {
+      // 詳細記錄錯誤資訊以便除錯
+      const errorMessage = err instanceof Error ? err.message : String(err)
       console.error('Meta 登入錯誤:', err)
-      setError('Facebook SDK 載入異常，請重新整理頁面後再試')
+      console.error('錯誤詳情:', errorMessage)
+
+      // 根據錯誤類型顯示不同訊息
+      if (errorMessage.includes('popup') || errorMessage.includes('blocked')) {
+        setError('彈窗被瀏覽器阻擋，請允許彈窗後重試')
+      } else {
+        setError('Meta 登入失敗：' + errorMessage)
+      }
       setOauthLoading(null)
     }
   }
