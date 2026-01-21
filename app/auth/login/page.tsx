@@ -384,11 +384,14 @@ export default function LoginPage() {
         strategy="afterInteractive"
         onLoad={() => {
           console.log('Facebook SDK script loaded')
-          // 如果 fbAsyncInit 已經被呼叫過了，SDK 不會再呼叫
-          // 所以我們需要手動檢查並初始化
-          if (window.FB && !fbSdkReady) {
+          // 使用 window.__fbInitCalled 而非 React state 來判斷是否已初始化
+          // React state 可能在組件重渲染時被重置
+          if (window.FB && !window.__fbInitCalled) {
             console.log('手動初始化 Facebook SDK（fbAsyncInit 可能已錯過）')
             initFacebookSdk()
+          } else if (window.__fbInitCalled) {
+            console.log('Script onLoad: SDK 已初始化，跳過')
+            setFbSdkReady(true)
           }
         }}
         onError={(e) => {
