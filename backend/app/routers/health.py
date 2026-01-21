@@ -201,8 +201,14 @@ async def get_latest_audit(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid account_id format")
 
-    result = await db.execute(query.limit(1))
-    audit_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(query.limit(1))
+        audit_record = result.scalar_one_or_none()
+    except Exception as e:
+        # 資料庫連線失敗
+        import logging
+        logging.warning(f"Database connection failed in get_latest_audit: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not audit_record:
         raise HTTPException(status_code=404, detail="No audit found")
@@ -234,12 +240,18 @@ async def get_audit(
         raise HTTPException(status_code=400, detail="Invalid audit ID format")
 
     # 從資料庫取得指定健檢報告
-    result = await db.execute(
-        select(HealthAuditModel)
-        .options(selectinload(HealthAuditModel.issues))
-        .where(HealthAuditModel.id == audit_uuid)
-    )
-    audit_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(HealthAuditModel)
+            .options(selectinload(HealthAuditModel.issues))
+            .where(HealthAuditModel.id == audit_uuid)
+        )
+        audit_record = result.scalar_one_or_none()
+    except Exception as e:
+        # 資料庫連線失敗
+        import logging
+        logging.warning(f"Database connection failed in get_audit: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not audit_record:
         raise HTTPException(status_code=404, detail="Audit not found")
@@ -303,17 +315,27 @@ async def resolve_issue(
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
     # 更新資料庫中的問題狀態
-    result = await db.execute(
-        select(AuditIssueModel).where(AuditIssueModel.id == issue_uuid)
-    )
-    issue = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(AuditIssueModel).where(AuditIssueModel.id == issue_uuid)
+        )
+        issue = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in resolve_issue: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    issue.status = "resolved"
-    issue.resolved_at = datetime.now(timezone.utc)
-    await db.flush()
+    try:
+        issue.status = "resolved"
+        issue.resolved_at = datetime.now(timezone.utc)
+        await db.flush()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database update failed in resolve_issue: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     return {
         "success": True,
@@ -348,16 +370,26 @@ async def ignore_issue(
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
     # 更新資料庫中的問題狀態
-    result = await db.execute(
-        select(AuditIssueModel).where(AuditIssueModel.id == issue_uuid)
-    )
-    issue = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(AuditIssueModel).where(AuditIssueModel.id == issue_uuid)
+        )
+        issue = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in ignore_issue: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    issue.status = "ignored"
-    await db.flush()
+    try:
+        issue.status = "ignored"
+        await db.flush()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database update failed in ignore_issue: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     return {
         "success": True,

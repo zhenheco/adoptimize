@@ -142,8 +142,26 @@ async def get_recommendations(
     if type:
         query = query.where(RecommendationDBModel.type == type)
 
-    result = await db.execute(query)
-    rec_records = result.scalars().all()
+    try:
+        result = await db.execute(query)
+        rec_records = result.scalars().all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空列表
+        import logging
+        logging.warning(f"Database connection failed in get_recommendations: {e}")
+        return RecommendationListResponse(
+            data=[],
+            meta={
+                "page": page,
+                "page_size": page_size,
+                "total": 0,
+                "total_pages": 0,
+            },
+            summary={
+                "pending_count": 0,
+                "estimated_savings": 0.0,
+            },
+        )
 
     # 轉換為 API 回應格式
     all_recommendations = [_convert_db_recommendation_to_response(r) for r in rec_records]
@@ -204,10 +222,15 @@ async def get_recommendation(
         raise HTTPException(status_code=400, detail="Invalid recommendation ID format")
 
     # 從資料庫取得建議
-    result = await db.execute(
-        select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
-    )
-    rec_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
+        )
+        rec_record = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in get_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not rec_record:
         raise HTTPException(status_code=404, detail="Recommendation not found")
@@ -249,8 +272,13 @@ async def execute_recommendation(
     if user_id:
         try:
             user_uuid = uuid.UUID(user_id)
-            result = await db.execute(select(User).where(User.id == user_uuid))
-            user_record = result.scalar_one_or_none()
+            try:
+                result = await db.execute(select(User).where(User.id == user_uuid))
+                user_record = result.scalar_one_or_none()
+            except Exception as e:
+                import logging
+                logging.warning(f"Database connection failed in execute_recommendation (user query): {e}")
+                raise HTTPException(status_code=503, detail="Database service unavailable")
         except ValueError:
             pass
 
@@ -275,10 +303,15 @@ async def execute_recommendation(
             )
 
     # 從資料庫取得建議
-    result = await db.execute(
-        select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
-    )
-    rec_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
+        )
+        rec_record = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in execute_recommendation (rec query): {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not rec_record:
         raise HTTPException(status_code=404, detail="Recommendation not found")
@@ -322,7 +355,12 @@ async def execute_recommendation(
         user_id=user_record.id if user_record else None,
     )
     db.add(action_history)
-    await db.flush()
+    try:
+        await db.flush()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database update failed in execute_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     return RecommendationActionResponse(
         success=True,
@@ -356,17 +394,27 @@ async def ignore_recommendation(
         raise HTTPException(status_code=400, detail="Invalid recommendation ID format")
 
     # 從資料庫取得建議
-    result = await db.execute(
-        select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
-    )
-    rec_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
+        )
+        rec_record = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in ignore_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not rec_record:
         raise HTTPException(status_code=404, detail="Recommendation not found")
 
     # 更新建議狀態
-    rec_record.status = "ignored"
-    await db.flush()
+    try:
+        rec_record.status = "ignored"
+        await db.flush()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database update failed in ignore_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     return RecommendationActionResponse(
         success=True,
@@ -412,8 +460,23 @@ async def get_action_history(
     # 排序（最新在前）
     query = query.order_by(ActionHistoryDBModel.created_at.desc())
 
-    result = await db.execute(query)
-    history_records = result.scalars().all()
+    try:
+        result = await db.execute(query)
+        history_records = result.scalars().all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空列表
+        import logging
+        logging.warning(f"Database connection failed in get_action_history: {e}")
+        return ActionHistoryResponse(
+            data=[],
+            meta={
+                "page": page,
+                "page_size": page_size,
+                "total": 0,
+                "total_pages": 0,
+                "days": days,
+            },
+        )
 
     # 轉換為回應格式
     all_history = [

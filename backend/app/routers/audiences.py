@@ -185,8 +185,25 @@ async def get_audiences(
     if type:
         query = query.where(AudienceModel.type == type.upper())
 
-    result = await db.execute(query)
-    audience_records = result.scalars().all()
+    try:
+        result = await db.execute(query)
+        audience_records = result.scalars().all()
+    except Exception as e:
+        # 資料庫連線失敗時，返回空列表
+        import logging
+        logging.warning(f"Database connection failed in get_audiences: {e}")
+        # 注意：AudienceListResponse 沒有 summary 欄位，不需要添加
+        # 但這個函數回傳的格式應與正常回傳一致
+        # 返回空列表而非拋出錯誤，讓前端能正常顯示「無資料」
+        return AudienceListResponse(
+            data=[],
+            meta={
+                "page": page,
+                "page_size": page_size,
+                "total": 0,
+                "total_pages": 0,
+            },
+        )
 
     # 轉換為 API 回應格式
     all_audiences = [_convert_db_audience_to_response(a) for a in audience_records]
@@ -291,12 +308,18 @@ async def get_audience(
         raise HTTPException(status_code=400, detail="Invalid audience ID format")
 
     # 從資料庫取得受眾
-    result = await db.execute(
-        select(AudienceModel)
-        .options(selectinload(AudienceModel.metrics))
-        .where(AudienceModel.id == audience_uuid)
-    )
-    audience_record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(AudienceModel)
+            .options(selectinload(AudienceModel.metrics))
+            .where(AudienceModel.id == audience_uuid)
+        )
+        audience_record = result.scalar_one_or_none()
+    except Exception as e:
+        # 資料庫連線失敗
+        import logging
+        logging.warning(f"Database connection failed in get_audience: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
 
     if not audience_record:
         raise HTTPException(status_code=404, detail="Audience not found")
