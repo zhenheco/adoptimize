@@ -297,7 +297,7 @@ export default function LoginPage() {
       return
     }
 
-    // 等待 SDK 初始化完成（SDK 在頁面載入時已開始初始化）
+    // 等待 SDK 載入完成
     console.log('[組件] handleMetaLogin: 等待 SDK 就緒')
     const sdkReady = await waitForFacebookSdk()
 
@@ -308,9 +308,21 @@ export default function LoginPage() {
       return
     }
 
-    console.log('[組件] handleMetaLogin: SDK 就緒，呼叫 FB.login()')
+    // 重要：在同一個 JavaScript 調用中先 FB.init() 再 FB.login()
+    // 這是因為 Facebook SDK 有一個奇怪的行為，分開呼叫會導致 "FB.login() called before FB.init()" 錯誤
+    console.log('[組件] handleMetaLogin: 重新初始化 SDK 並呼叫 FB.login()')
 
     try {
+      // 先重新初始化（即使已經初始化過）
+      window.FB.init({
+        appId: FB_APP_ID,
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0',
+      })
+      console.log('[組件] handleMetaLogin: FB.init() 完成')
+
+      // 立即呼叫 FB.login()
       window.FB.login(
         (response) => {
           // 注意：FB.login callback 不能是 async function
