@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // 確保組件已掛載，並讀取 URL 參數中的錯誤訊息
@@ -88,22 +88,19 @@ export default function LoginPage() {
    */
   const handleGoogleLogin = async () => {
     setError(null)
-    setOauthLoading('google')
+    setIsGoogleLoading(true)
 
     try {
       const response = await fetch('/api/v1/auth/oauth/google')
       const data = await response.json()
 
       if (!response.ok) {
-        const errorMsg = data.error?.message || data.detail?.message || data.error || '無法啟動 Google 登入'
-        setError(errorMsg)
-        setOauthLoading(null)
+        setError(data.error?.message || data.detail?.message || data.error || '無法啟動 Google 登入')
         return
       }
 
       if (!data.auth_url) {
         setError('Google OAuth 設定錯誤，請聯絡管理員')
-        setOauthLoading(null)
         return
       }
 
@@ -112,7 +109,8 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Google 登入錯誤:', err)
       setError('無法連接到伺服器，請稍後再試')
-      setOauthLoading(null)
+    } finally {
+      setIsGoogleLoading(false)
     }
   }
 
@@ -152,28 +150,24 @@ export default function LoginPage() {
       <CardContent className="space-y-4">
         {/* Email/密碼登入表單 */}
         <form onSubmit={handleEmailLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isLoading}
-              className="h-12"
-            />
-          </div>
-          <div className="space-y-2">
-            <Input
-              type="password"
-              placeholder="密碼"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-              className="h-12"
-            />
-          </div>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={isLoading}
+            className="h-12"
+          />
+          <Input
+            type="password"
+            placeholder="密碼"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            className="h-12"
+          />
 
           {/* 錯誤訊息 */}
           {error && (
@@ -219,7 +213,7 @@ export default function LoginPage() {
           variant="outline"
           className="w-full h-12 text-base font-medium relative"
           onClick={handleGoogleLogin}
-          disabled={isLoading || oauthLoading === 'google'}
+          disabled={isLoading || isGoogleLoading}
         >
           <div className="absolute left-4 w-6 h-6 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-5 h-5">
