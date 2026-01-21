@@ -59,12 +59,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 成功後創建響應並設置 cookie
-    const res = NextResponse.redirect(
-      new URL('/dashboard', request.url)
-    );
+    // 成功後重定向到 callback 中間頁面，帶上 token
+    // 這樣前端才能將 token 存入 localStorage
+    const callbackUrl = new URL('/auth/callback', request.url);
+    callbackUrl.searchParams.set('access_token', data.data.access_token);
 
-    // 設置 httpOnly cookie 存儲 refresh token
+    // 如果有 user 資訊，也傳遞給前端
+    if (data.data.user) {
+      callbackUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(data.data.user)));
+    }
+
+    const res = NextResponse.redirect(callbackUrl);
+
+    // 設置 httpOnly cookie 存儲 refresh token（用於 token 刷新）
     if (data.data?.refresh_token) {
       res.cookies.set('refresh_token', data.data.refresh_token, {
         httpOnly: true,

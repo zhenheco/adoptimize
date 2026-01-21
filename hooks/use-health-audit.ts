@@ -37,8 +37,12 @@ export function useHealthAudit(accountId?: string): UseHealthAuditReturn {
   const [issues, setIssues] = useState<AuditIssue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const fetchData = useCallback(async () => {
+    // SSR 保護：確保只在瀏覽器環境執行
+    if (typeof window === 'undefined') return;
+
     setIsLoading(true);
     setError(null);
 
@@ -144,14 +148,23 @@ export function useHealthAudit(accountId?: string): UseHealthAuditReturn {
     }
   }, []);
 
+  // 確保組件已掛載（客戶端渲染完成）
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    setMounted(true);
+  }, []);
+
+  // 只在掛載後才執行 fetchData
+  useEffect(() => {
+    if (mounted) {
+      fetchData();
+    }
+  }, [mounted, fetchData]);
 
   return {
     audit,
     issues,
-    isLoading,
+    // 未掛載時也顯示 loading 狀態，避免 hydration mismatch
+    isLoading: !mounted || isLoading,
     error,
     refetch: fetchData,
     triggerAudit,
