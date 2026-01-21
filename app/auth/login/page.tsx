@@ -298,12 +298,25 @@ export default function LoginPage() {
       return
     }
 
-    // 檢查 SDK 是否已初始化
+    // 如果 SDK 存在但未正確初始化，嘗試修復
     if (!isFbInitialized()) {
-      console.log('[組件] handleMetaLogin: SDK 未初始化')
-      setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
-      setOauthLoading(null)
-      return
+      console.log('[組件] handleMetaLogin: SDK 存在但未初始化，嘗試手動初始化')
+      try {
+        window.FB.init({
+          appId: FB_APP_ID,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0',
+        })
+        window.__fbInitCalled = true
+        sessionStorage.setItem('fb_sdk_initialized', 'true')
+        console.log('[組件] handleMetaLogin: 手動初始化成功')
+      } catch (initErr) {
+        console.error('[組件] handleMetaLogin: 手動初始化失敗', initErr)
+        setError('Facebook SDK 初始化失敗，請重新整理頁面後再試')
+        setOauthLoading(null)
+        return
+      }
     }
 
     console.log('[組件] handleMetaLogin: 即將呼叫 FB.login()')
