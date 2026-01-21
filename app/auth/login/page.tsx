@@ -255,6 +255,14 @@ export default function LoginPage() {
     setError(null)
     setOauthLoading('meta')
 
+    // 調試日誌
+    console.log('[組件] handleMetaLogin 開始', {
+      fbExists: !!window.FB,
+      __fbInitCalled: window.__fbInitCalled,
+      isFbInitialized: isFbInitialized(),
+      fbSdkReady
+    })
+
     // 檢查是否在 HTTPS 環境（Facebook SDK 要求）
     if (typeof window !== 'undefined' && window.location.protocol !== 'https:') {
       // 本地開發環境不支援 FB.login，顯示提示訊息
@@ -277,6 +285,8 @@ export default function LoginPage() {
       setOauthLoading(null)
       return
     }
+
+    console.log('[組件] handleMetaLogin: 即將呼叫 FB.login()')
 
     try {
       window.FB.login(
