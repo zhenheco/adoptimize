@@ -78,6 +78,35 @@ async def health_check() -> dict:
     }
 
 
+@app.get("/api/config-status")
+async def config_status() -> dict:
+    """
+    配置狀態檢查端點
+    用於確認環境變數是否正確載入（不顯示敏感值）
+    """
+    return {
+        "database": {
+            "configured": bool(settings.DATABASE_URL and "localhost" not in settings.DATABASE_URL),
+        },
+        "redis": {
+            "configured": bool(settings.REDIS_URL and "localhost" not in settings.REDIS_URL),
+        },
+        "google_oauth": {
+            "client_id_configured": bool(settings.GOOGLE_CLIENT_ID),
+            "client_secret_configured": bool(settings.GOOGLE_CLIENT_SECRET),
+        },
+        "meta_oauth": {
+            "app_id_configured": bool(settings.META_APP_ID),
+            "app_id_value": settings.META_APP_ID[:10] + "..." if settings.META_APP_ID else None,
+            "app_secret_configured": bool(settings.META_APP_SECRET),
+        },
+        "jwt": {
+            "configured": bool(settings.JWT_SECRET_KEY and settings.JWT_SECRET_KEY != "your-super-secret-key-change-in-production"),
+        },
+        "cors_origins": settings.cors_origins,
+    }
+
+
 @app.get("/")
 async def root() -> dict:
     """根路徑重導向"""
