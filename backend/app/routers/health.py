@@ -205,13 +205,47 @@ async def get_latest_audit(
         result = await db.execute(query.limit(1))
         audit_record = result.scalar_one_or_none()
     except Exception as e:
-        # 資料庫連線失敗
+        # 資料庫連線失敗，返回空的健檢報告
         import logging
         logging.warning(f"Database connection failed in get_latest_audit: {e}")
-        raise HTTPException(status_code=503, detail="Database service unavailable")
+        # 返回空的健檢報告，讓前端可以正常顯示「尚未進行健檢」
+        empty_audit = HealthAuditWithIssues(
+            id="",
+            account_id="",
+            overall_score=0,
+            dimensions={
+                "structure": AuditDimension(score=0, weight=0.20, issues=0),
+                "creative": AuditDimension(score=0, weight=0.25, issues=0),
+                "audience": AuditDimension(score=0, weight=0.25, issues=0),
+                "budget": AuditDimension(score=0, weight=0.20, issues=0),
+                "tracking": AuditDimension(score=0, weight=0.10, issues=0),
+            },
+            grade="N/A",
+            issues_count=0,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            issues=[],
+        )
+        return HealthAuditResponse(data=empty_audit)
 
     if not audit_record:
-        raise HTTPException(status_code=404, detail="No audit found")
+        # 沒有健檢記錄，返回空的健檢報告
+        empty_audit = HealthAuditWithIssues(
+            id="",
+            account_id="",
+            overall_score=0,
+            dimensions={
+                "structure": AuditDimension(score=0, weight=0.20, issues=0),
+                "creative": AuditDimension(score=0, weight=0.25, issues=0),
+                "audience": AuditDimension(score=0, weight=0.25, issues=0),
+                "budget": AuditDimension(score=0, weight=0.20, issues=0),
+                "tracking": AuditDimension(score=0, weight=0.10, issues=0),
+            },
+            grade="N/A",
+            issues_count=0,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            issues=[],
+        )
+        return HealthAuditResponse(data=empty_audit)
 
     # 轉換資料庫記錄為 API 回應格式
     audit = _convert_db_audit_to_response(audit_record)
