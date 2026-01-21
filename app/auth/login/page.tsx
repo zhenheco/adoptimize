@@ -67,18 +67,13 @@ export default function LoginPage() {
 
   /**
    * 檢查 Facebook SDK 是否已經初始化
-   * FB.init() 後會設定 FB.AppEvents，可以用來判斷
+   * 注意：不能用 FB.AppEvents 判斷，因為它在 SDK 載入時就會自動設置
+   * 必須使用我們自己的標記 window.__fbInitCalled
    */
   const isFbInitialized = useCallback((): boolean => {
-    // 方法 1: 檢查我們的標記
-    if (window.__fbInitCalled === true) {
-      return true
-    }
-    // 方法 2: 檢查 FB.AppEvents（FB.init 後會設定）
-    if (window.FB && (window.FB as unknown as { AppEvents?: unknown }).AppEvents) {
-      return true
-    }
-    return false
+    // 只使用我們的標記來判斷是否已初始化
+    // FB.AppEvents 在 SDK 載入時就存在，不代表 FB.init() 已被呼叫
+    return window.__fbInitCalled === true
   }, [])
 
   /**
