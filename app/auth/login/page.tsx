@@ -43,6 +43,8 @@ declare global {
     fbAsyncInit?: () => void
     // 使用 window 物件存儲初始化狀態，確保跨模組共享
     __fbInitCalled?: boolean
+    // 同步鎖，防止並發初始化
+    __fbInitLock?: boolean
     // 用於通知 React 組件 SDK 已就緒
     __fbSdkReadyCallbacks?: Array<() => void>
   }
@@ -51,9 +53,10 @@ declare global {
 /**
  * 初始化 Facebook SDK 的函數
  * 確保只呼叫一次 FB.init()
+ * 使用同步鎖防止競態條件
  */
 function initializeFacebookSdk(appId: string, onReady: () => void): void {
-  // 如果已經初始化，直接觸發回調
+  // 如果已經初始化完成，直接觸發回調
   if (window.__fbInitCalled && window.FB) {
     console.log('[initFB] 已初始化，直接觸發回調')
     onReady()
@@ -65,6 +68,15 @@ function initializeFacebookSdk(appId: string, onReady: () => void): void {
     window.__fbSdkReadyCallbacks = []
   }
   window.__fbSdkReadyCallbacks.push(onReady)
+
+  // 使用同步鎖防止並發初始化（這是關鍵！）
+  // 必須在任何異步操作之前檢查和設置
+  if (window.__fbInitLock) {
+    console.log('[initFB] 正在初始化中，已添加回調等待')
+    return
+  }
+  window.__fbInitLock = true
+  console.log('[initFB] 取得初始化鎖')
 
   // 如果已經有 script 標籤在載入，等待即可
   if (document.getElementById('facebook-jssdk')) {
