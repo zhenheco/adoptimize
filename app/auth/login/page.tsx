@@ -17,11 +17,7 @@ import { Input } from '@/components/ui/input'
 // Facebook App ID
 const FB_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || '1336497714898181'
 
-// 模組級變數，確保 FB.init() 只被呼叫一次
-// （React Strict Mode 會導致組件重新渲染，但這個變數會保持不變）
-let fbInitCalled = false
-
-// 聲明 FB SDK 全域類型
+// 聲明 FB SDK 全域類型（包含我們的初始化標記）
 declare global {
   interface Window {
     FB?: {
@@ -46,6 +42,8 @@ declare global {
       ) => void
     }
     fbAsyncInit?: () => void
+    // 使用 window 物件存儲初始化狀態，確保跨模組共享
+    __fbInitCalled?: boolean
   }
 }
 
@@ -69,12 +67,13 @@ export default function LoginPage() {
 
   /**
    * 初始化 Facebook SDK
-   * 使用模組級變數確保 FB.init() 只被呼叫一次
+   * 使用 window.__fbInitCalled 確保 FB.init() 只被呼叫一次
+   * （window 物件是真正的全域，不會因為模組重載而重置）
    */
   const initFacebookSdk = useCallback(() => {
     // 如果已經初始化過，直接更新 state 並返回
-    if (fbInitCalled) {
-      console.log('Facebook SDK 已經初始化過了（跳過重複呼叫）')
+    if (window.__fbInitCalled) {
+      console.log('Facebook SDK 已經初始化過了（window.__fbInitCalled = true）')
       setFbSdkReady(true)
       return
     }
@@ -87,9 +86,9 @@ export default function LoginPage() {
           xfbml: true,
           version: 'v18.0',
         })
-        fbInitCalled = true  // 標記為已初始化
+        window.__fbInitCalled = true  // 標記為已初始化（存在 window 上）
         setFbSdkReady(true)
-        console.log('Facebook SDK 初始化成功')
+        console.log('Facebook SDK 初始化成功（window.__fbInitCalled 設為 true）')
       } catch (initError) {
         console.error('Facebook SDK init 失敗:', initError)
       }
@@ -222,8 +221,8 @@ export default function LoginPage() {
     }
 
     // 如果 SDK 還沒初始化，先初始化
-    // 使用模組級變數 fbInitCalled 來確認是否真的初始化過
-    if (!fbInitCalled) {
+    // 使用 window.__fbInitCalled 來確認是否真的初始化過
+    if (!window.__fbInitCalled) {
       try {
         console.log('handleMetaLogin: 嘗試初始化 Facebook SDK...')
         window.FB.init({
@@ -232,7 +231,7 @@ export default function LoginPage() {
           xfbml: true,
           version: 'v18.0',
         })
-        fbInitCalled = true
+        window.__fbInitCalled = true
         setFbSdkReady(true)
         console.log('handleMetaLogin: Facebook SDK 初始化成功')
       } catch (initErr) {
