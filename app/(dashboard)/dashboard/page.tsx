@@ -2,51 +2,107 @@
 
 import { useState } from 'react';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
-import { TimeFilter } from '@/components/dashboard/time-filter';
-import { TrendChartWrapper } from '@/components/dashboard/trend-chart-wrapper';
-import { PeriodComparisonWrapper } from '@/components/dashboard/period-comparison-wrapper';
-import type { TimePeriod } from '@/lib/api/types';
+import { AutopilotStatus } from '@/components/dashboard/autopilot-status';
+import { AIActionsList } from '@/components/dashboard/ai-actions-list';
+import { PendingDecisions } from '@/components/dashboard/pending-decisions';
+
+// Mock data - 之後會從 API 取得
+const mockAutopilot = {
+  enabled: true,
+  targetCpa: 500,
+  monthlyBudget: 50000,
+  daysSinceStart: 15,
+  totalSavings: 12400,
+};
+
+const mockActions = [
+  {
+    id: '1',
+    date: '1/22',
+    action: '暫停「測試廣告 A」',
+    reason: '成本過高',
+    savings: 2100,
+  },
+  {
+    id: '2',
+    date: '1/20',
+    action: '加碼「熱銷商品」+20%',
+    reason: '表現優異',
+    earnings: 8500,
+  },
+  {
+    id: '3',
+    date: '1/18',
+    action: '暫停 3 個疲勞素材',
+    reason: '點擊率下降',
+    savings: 1800,
+  },
+];
+
+const mockDecisions = [
+  {
+    id: '1',
+    type: 'budget_increase',
+    title: '預算即將用完',
+    description: '本月預算剩 $17,550（35%），預計 5 天後用完。以目前表現，建議加碼 $20,000 可多帶來約 40 筆訂單。',
+    options: [
+      { label: '不用了', value: 'ignore' },
+      { label: '加碼 $10,000', value: 'add_10000' },
+      { label: '加碼 $20,000', value: 'add_20000' },
+    ],
+  },
+];
 
 /**
- * 儀表板總覽頁面
+ * 首頁儀表板
  *
- * 顯示跨平台廣告數據摘要，包含：
- * - 核心指標卡片（花費、曝光、點擊、轉換、CPA、ROAS）
- * - 效能趨勢圖表
- *
- * 數據來源: /api/v1/dashboard/overview
+ * SDD v2.0: 簡化設計，聚焦老闆關心的指標
+ * - 自動駕駛狀態
+ * - 3 個核心指標（花費、訂單、投報率）
+ * - AI 執行記錄
+ * - 待決定事項
  */
 export default function DashboardPage() {
-  const [period, setPeriod] = useState<TimePeriod>('7d');
+  const [decisions, setDecisions] = useState(mockDecisions);
+
+  const handleDecide = (decisionId: string, value: string) => {
+    // TODO: 呼叫 API 處理決策
+    console.log('Decision:', decisionId, value);
+    setDecisions((prev) => prev.filter((d) => d.id !== decisionId));
+  };
+
+  // 取得當前日期
+  const today = new Date();
+  const dateStr = `${today.getMonth() + 1}/${today.getDate()}（${['日', '一', '二', '三', '四', '五', '六'][today.getDay()]}）`;
 
   return (
     <div className="space-y-6">
-      {/* 頁面標題與時間篩選器 */}
+      {/* 歡迎標題 */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            儀表板總覽
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            跨平台廣告效果一覽
-          </p>
-        </div>
-        <TimeFilter value={period} onChange={setPeriod} />
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          👋 嗨，老闆
+        </h1>
+        <span className="text-gray-500 dark:text-gray-400">
+          今天 {dateStr}
+        </span>
       </div>
 
-      {/* 核心指標卡片（從 API 獲取數據） */}
-      <DashboardMetrics period={period} />
+      {/* 自動駕駛狀態 */}
+      <AutopilotStatus {...mockAutopilot} />
 
-      {/* D-006: 期間比較表格 */}
-      <PeriodComparisonWrapper period={period} />
-
-      {/* 趨勢圖表區域 */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      {/* 本月指標 */}
+      <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          效能趨勢
+          📊 本月到目前為止
         </h2>
-        <TrendChartWrapper />
+        <DashboardMetrics period="30d" />
       </div>
+
+      {/* AI 執行記錄 */}
+      <AIActionsList actions={mockActions} />
+
+      {/* 待決定事項 */}
+      <PendingDecisions decisions={decisions} onDecide={handleDecide} />
     </div>
   );
 }
