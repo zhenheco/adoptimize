@@ -6,6 +6,7 @@ API 路由模組
 - /auth - 認證系統
 - /autopilot - 自動駕駛（SDD v2.0）
 - /reports - 報告（SDD v2.0）
+- /ai - AI 創作（SDD v2.0）
 - /dashboard - 儀表板總覽
 - /creatives - 素材管理
 - /audiences - 受眾分析
@@ -21,6 +22,7 @@ from fastapi import APIRouter
 
 from app.routers import (
     accounts,
+    ai_copywriting,
     auth,
     audits,
     audiences,
@@ -57,6 +59,13 @@ api_router.include_router(
     reports.router,
     prefix="/reports",
     tags=["Reports"],
+)
+
+# AI 文案生成路由
+api_router.include_router(
+    ai_copywriting.router,
+    prefix="/ai",
+    tags=["AI"],
 )
 
 # 儀表板路由
