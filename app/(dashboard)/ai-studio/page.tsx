@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Image, Copy, RefreshCw, Lock } from 'lucide-react';
+import { useAICopywriting } from '@/hooks/use-ai-copywriting';
 
 interface GeneratedCopy {
   id: string;
@@ -27,32 +28,28 @@ const mockHistory: GeneratedCopy[] = [
 
 export default function AIStudioPage() {
   const [productDescription, setProductDescription] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
   const [usageCount] = useState(5);
   const usageLimit = 20;
 
+  const { generate, isLoading: isGenerating, error } = useAICopywriting();
+
   const handleGenerate = async () => {
     if (!productDescription.trim()) return;
 
-    setIsGenerating(true);
-    // TODO: 呼叫 API 生成文案
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const result = await generate(productDescription);
 
-    setGeneratedCopy({
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }),
-      productName: productDescription.slice(0, 20),
-      headlines: [
-        '限時優惠！' + productDescription.slice(0, 10) + '特價中',
-        productDescription.slice(0, 10) + ' - 品質保證，價格實惠',
-      ],
-      descriptions: [
-        '精選' + productDescription.slice(0, 15) + '，限時特惠中。立即選購，享受最優惠價格！',
-        '想要' + productDescription.slice(0, 10) + '？現在正是最佳時機。品質保證，售後無憂。',
-      ],
-    });
-    setIsGenerating(false);
+      setGeneratedCopy({
+        id: Date.now().toString(),
+        date: new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }),
+        productName: productDescription.slice(0, 20),
+        headlines: result.headlines,
+        descriptions: result.descriptions,
+      });
+    } catch {
+      // 錯誤已由 hook 處理
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -166,6 +163,15 @@ export default function AIStudioPage() {
           </p>
         </div>
       </div>
+
+      {/* 錯誤訊息 */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-600 dark:text-red-400">
+            生成失敗：{error.message}
+          </p>
+        </div>
+      )}
 
       {/* 生成結果 */}
       {generatedCopy && (
