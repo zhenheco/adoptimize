@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api/client';
 
 interface AutopilotSettings {
@@ -32,35 +32,63 @@ interface AutopilotLog {
   executed_at: string;
 }
 
-const fetcher = async <T>(url: string) => {
-  return api.get<T>(url);
-};
-
 export function useAutopilotSettings() {
-  const { data, error, isLoading, mutate } = useSWR<AutopilotStatus>(
-    '/autopilot/settings',
-    fetcher
-  );
+  const [data, setData] = useState<AutopilotStatus | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const result = await api.get<AutopilotStatus>('/autopilot/settings');
+      setData(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('載入失敗'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return {
     data,
     error,
     isLoading,
-    mutate,
+    mutate: fetchData,
   };
 }
 
 export function useAutopilotLogs(limit = 20) {
-  const { data, error, isLoading, mutate } = useSWR<AutopilotLog[]>(
-    `/autopilot/logs?limit=${limit}`,
-    fetcher
-  );
+  const [logs, setLogs] = useState<AutopilotLog[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const result = await api.get<AutopilotLog[]>(`/autopilot/logs?limit=${limit}`);
+      setLogs(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('載入失敗'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [limit]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return {
-    logs: data || [],
+    logs,
     error,
     isLoading,
-    mutate,
+    mutate: fetchData,
   };
 }
 
