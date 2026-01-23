@@ -16,6 +16,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.audience import Audience
     from app.models.audience_suggestion import AudienceSuggestion
+    from app.models.autopilot_log import AutopilotLog
     from app.models.campaign import Campaign
     from app.models.creative import Creative
     from app.models.health_audit import HealthAudit
@@ -101,6 +102,11 @@ class AdAccount(Base):
     )
     audience_suggestions: Mapped[list["AudienceSuggestion"]] = relationship(
         "AudienceSuggestion",
+        back_populates="account",
+        cascade="all, delete-orphan",
+    )
+    autopilot_logs: Mapped[list["AutopilotLog"]] = relationship(
+        "AutopilotLog",
         back_populates="account",
         cascade="all, delete-orphan",
     )

@@ -6,6 +6,7 @@ SQLAlchemy 模型導出
 from app.models.action_history import ActionHistory
 from app.models.ad import Ad
 from app.models.ad_account import AdAccount
+from app.models.autopilot_log import AutopilotLog
 from app.models.ad_set import AdSet
 from app.models.audience import Audience
 from app.models.audience_metrics import AudienceMetrics
@@ -24,6 +25,7 @@ from app.models.user import User
 __all__ = [
     "User",
     "AdAccount",
+    "AutopilotLog",
     "Campaign",
     "AdSet",
     "Ad",
