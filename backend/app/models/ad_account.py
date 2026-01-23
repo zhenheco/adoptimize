@@ -5,10 +5,10 @@
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -68,6 +68,20 @@ class AdAccount(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+    # 自動駕駛設定
+    autopilot_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        comment="是否啟用自動駕駛",
+    )
+    autopilot_settings: Mapped[Optional[dict]] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="自動駕駛設定: target_cpa, monthly_budget, goal_type, auto_pause_enabled, auto_adjust_budget_enabled, auto_boost_enabled, notify_before_action",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
