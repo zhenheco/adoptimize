@@ -6,10 +6,10 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  Image,
-  Users,
-  HeartPulse,
-  Zap,
+  Car,
+  Sparkles,
+  FileText,
+  Link2,
   Settings,
   LogOut,
   Sun,
@@ -31,13 +31,15 @@ interface NavItem {
 
 /**
  * 側邊欄導航項目
+ *
+ * SDD v2.0: 簡化導航，聚焦自動駕駛和 AI 創作
  */
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: '儀表板', icon: LayoutDashboard },
-  { href: '/creatives', label: '素材管理', icon: Image },
-  { href: '/audiences', label: '受眾分析', icon: Users },
-  { href: '/health', label: '帳戶健檢', icon: HeartPulse },
-  { href: '/actions', label: '行動中心', icon: Zap },
+  { href: '/dashboard', label: '首頁', icon: LayoutDashboard },
+  { href: '/autopilot', label: '自動駕駛', icon: Car },
+  { href: '/ai-studio', label: 'AI 創作', icon: Sparkles },
+  { href: '/reports', label: '報告', icon: FileText },
+  { href: '/accounts', label: '帳號連接', icon: Link2 },
 ];
 
 /**
