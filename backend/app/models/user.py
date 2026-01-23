@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.models.ad_account import AdAccount
     from app.models.audience_suggestion import AudienceSuggestion
     from app.models.notification import Notification
+    from app.models.report import Report
 
 
 class User(Base):
@@ -125,6 +126,11 @@ class User(Base):
     )
     audience_suggestions: Mapped[list["AudienceSuggestion"]] = relationship(
         "AudienceSuggestion",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    reports: Mapped[list["Report"]] = relationship(
+        "Report",
         back_populates="user",
         cascade="all, delete-orphan",
     )

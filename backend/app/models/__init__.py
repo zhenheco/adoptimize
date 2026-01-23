@@ -20,6 +20,7 @@ from app.models.industry_benchmark import IndustryBenchmark
 from app.models.interest_tag import InterestTag
 from app.models.notification import Notification
 from app.models.recommendation import Recommendation
+from app.models.report import Report
 from app.models.user import User
 
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
     "Notification",
     "IndustryBenchmark",
     "InterestTag",
+    "Report",
 ]
