@@ -4,6 +4,7 @@ API 路由模組
 
 註冊所有 API 路由：
 - /auth - 認證系統
+- /autopilot - 自動駕駛（SDD v2.0）
 - /dashboard - 儀表板總覽
 - /creatives - 素材管理
 - /audiences - 受眾分析
@@ -22,6 +23,7 @@ from app.routers import (
     auth,
     audits,
     audiences,
+    autopilot,
     creatives,
     dashboard,
     health,
@@ -39,6 +41,13 @@ api_router.include_router(
     auth.router,
     prefix="/auth",
     tags=["Authentication"],
+)
+
+# 自動駕駛路由
+api_router.include_router(
+    autopilot.router,
+    prefix="/autopilot",
+    tags=["Autopilot"],
 )
 
 # 儀表板路由
