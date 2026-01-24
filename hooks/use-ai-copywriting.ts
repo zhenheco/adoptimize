@@ -17,11 +17,15 @@ export function useAICopywriting() {
     setError(null);
 
     try {
+      // 從 localStorage 讀取 token
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
       // 使用相對路徑呼叫 Next.js API 路由（代理到後端）
       const res = await fetch('/api/v1/ai/copywriting', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
           product_description: productDescription,

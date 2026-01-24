@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const cookieStore = await cookies();
-    const token = cookieStore.get('access_token')?.value;
+
+    // 從 Authorization header 讀取 token
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
     if (!token) {
       return NextResponse.json(
