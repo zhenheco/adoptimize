@@ -2,17 +2,45 @@
 
 import { useState } from 'react';
 
-interface CopywritingResult {
+// Google Ads 文案結構
+interface GoogleAdsResult {
   headlines: string[];
   descriptions: string[];
 }
 
+// Meta Ads 文案結構
+interface MetaAdsResult {
+  primary_texts: string[];
+  headlines: string[];
+  descriptions: string[];
+}
+
+// 全平台文案結構
+interface AllPlatformResult {
+  google: GoogleAdsResult;
+  meta: MetaAdsResult;
+}
+
+// 支援的平台類型
+type Platform = 'google' | 'meta' | 'all';
+
+// 根據平台返回不同的結果類型
+type CopywritingResult<T extends Platform> = T extends 'all'
+  ? AllPlatformResult
+  : T extends 'meta'
+    ? MetaAdsResult
+    : GoogleAdsResult;
+
 export function useAICopywriting() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [result, setResult] = useState<CopywritingResult | null>(null);
+  const [result, setResult] = useState<AllPlatformResult | GoogleAdsResult | MetaAdsResult | null>(null);
 
-  const generate = async (productDescription: string, style = 'professional') => {
+  const generate = async <T extends Platform = 'all'>(
+    productDescription: string,
+    style = 'professional',
+    platform: T = 'all' as T
+  ): Promise<CopywritingResult<T>> => {
     setIsLoading(true);
     setError(null);
 
@@ -30,6 +58,7 @@ export function useAICopywriting() {
         body: JSON.stringify({
           product_description: productDescription,
           style,
+          platform,
         }),
       });
 
@@ -40,7 +69,7 @@ export function useAICopywriting() {
       }
 
       setResult(data);
-      return data as CopywritingResult;
+      return data as CopywritingResult<T>;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('生成失敗');
       setError(error);
@@ -61,3 +90,6 @@ export function useAICopywriting() {
     },
   };
 }
+
+// 匯出類型供其他元件使用
+export type { GoogleAdsResult, MetaAdsResult, AllPlatformResult, Platform };

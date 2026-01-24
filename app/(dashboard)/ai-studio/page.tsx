@@ -2,8 +2,25 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Image, Copy, RefreshCw, Lock } from 'lucide-react';
-import { useAICopywriting } from '@/hooks/use-ai-copywriting';
+import { Sparkles, Image, Copy, RefreshCw, Lock, Check } from 'lucide-react';
+import { useAICopywriting, type Platform, type AllPlatformResult, type GoogleAdsResult, type MetaAdsResult } from '@/hooks/use-ai-copywriting';
+
+// 平台選項
+const PLATFORMS: { value: Platform; label: string; description: string }[] = [
+  { value: 'all', label: '全平台', description: 'Google + Meta' },
+  { value: 'google', label: 'Google Ads', description: 'RSA 響應式搜尋廣告' },
+  { value: 'meta', label: 'Meta Ads', description: 'Facebook / Instagram' },
+];
+
+// 風格選項
+const STYLES = [
+  { value: 'professional', label: '專業', emoji: '💼' },
+  { value: 'casual', label: '輕鬆', emoji: '😊' },
+  { value: 'urgent', label: '緊迫', emoji: '⚡' },
+  { value: 'friendly', label: '親切', emoji: '🤝' },
+  { value: 'luxury', label: '高端', emoji: '✨' },
+  { value: 'playful', label: '活潑', emoji: '🎉' },
+];
 
 interface GeneratedCopy {
   id: string;
@@ -26,9 +43,130 @@ const mockHistory: GeneratedCopy[] = [
   },
 ];
 
+// 複製提示元件
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Button variant="ghost" size="sm" onClick={handleCopy}>
+      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+    </Button>
+  );
+}
+
+// 文案項目元件
+function CopyItem({ text, charLimit }: { text: string; charLimit?: number }) {
+  const charCount = text.length;
+  const isOverLimit = charLimit && charCount > charLimit;
+
+  return (
+    <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2 group">
+      <div className="flex-1">
+        <span className="text-gray-900 dark:text-white">{text}</span>
+        {charLimit && (
+          <span className={`text-xs ml-2 ${isOverLimit ? 'text-red-500' : 'text-gray-400'}`}>
+            ({charCount}/{charLimit})
+          </span>
+        )}
+      </div>
+      <CopyButton text={text} />
+    </div>
+  );
+}
+
+// Google Ads 結果元件
+function GoogleAdsResults({ result }: { result: GoogleAdsResult }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
+          <span className="text-white text-xs font-bold">G</span>
+        </div>
+        <h3 className="font-semibold text-gray-900 dark:text-white">Google Ads</h3>
+        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">RSA</span>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          標題（{result.headlines.length} 個）
+          <span className="text-gray-400 ml-2">限 30 字元</span>
+        </h4>
+        {result.headlines.map((headline, i) => (
+          <CopyItem key={i} text={headline} charLimit={30} />
+        ))}
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          描述（{result.descriptions.length} 個）
+          <span className="text-gray-400 ml-2">限 90 字元</span>
+        </h4>
+        {result.descriptions.map((desc, i) => (
+          <CopyItem key={i} text={desc} charLimit={90} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Meta Ads 結果元件
+function MetaAdsResults({ result }: { result: MetaAdsResult }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-pink-500 rounded flex items-center justify-center">
+          <span className="text-white text-xs font-bold">M</span>
+        </div>
+        <h3 className="font-semibold text-gray-900 dark:text-white">Meta Ads</h3>
+        <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">FB/IG</span>
+      </div>
+
+      {result.primary_texts && result.primary_texts.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            主要文案（{result.primary_texts.length} 個）
+            <span className="text-gray-400 ml-2">建議 125 字元內</span>
+          </h4>
+          {result.primary_texts.map((text, i) => (
+            <CopyItem key={i} text={text} charLimit={125} />
+          ))}
+        </div>
+      )}
+
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          標題（{result.headlines.length} 個）
+          <span className="text-gray-400 ml-2">限 27 字元</span>
+        </h4>
+        {result.headlines.map((headline, i) => (
+          <CopyItem key={i} text={headline} charLimit={27} />
+        ))}
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          描述（{result.descriptions.length} 個）
+          <span className="text-gray-400 ml-2">限 30 字元</span>
+        </h4>
+        {result.descriptions.map((desc, i) => (
+          <CopyItem key={i} text={desc} charLimit={30} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AIStudioPage() {
   const [productDescription, setProductDescription] = useState('');
-  const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
+  const [platform, setPlatform] = useState<Platform>('all');
+  const [style, setStyle] = useState('professional');
+  const [generatedResult, setGeneratedResult] = useState<AllPlatformResult | GoogleAdsResult | MetaAdsResult | null>(null);
   const [usageCount] = useState(5);
   const usageLimit = 20;
 
@@ -38,23 +176,20 @@ export default function AIStudioPage() {
     if (!productDescription.trim()) return;
 
     try {
-      const result = await generate(productDescription);
-
-      setGeneratedCopy({
-        id: Date.now().toString(),
-        date: new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }),
-        productName: productDescription.slice(0, 20),
-        headlines: result.headlines,
-        descriptions: result.descriptions,
-      });
+      const result = await generate(productDescription, style, platform);
+      setGeneratedResult(result);
     } catch {
       // 錯誤已由 hook 處理
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    // TODO: 顯示複製成功提示
+  // 判斷結果類型
+  const isAllPlatform = (r: unknown): r is AllPlatformResult => {
+    return r !== null && typeof r === 'object' && 'google' in r && 'meta' in r;
+  };
+
+  const isMeta = (r: unknown): r is MetaAdsResult => {
+    return r !== null && typeof r === 'object' && 'primary_texts' in r;
   };
 
   return (
@@ -99,10 +234,57 @@ export default function AIStudioPage() {
             </div>
           </div>
 
+          {/* 平台選擇 */}
+          <div className="mb-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              目標平台
+            </label>
+            <div className="flex gap-2">
+              {PLATFORMS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPlatform(p.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    platform === p.value
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {PLATFORMS.find((p) => p.value === platform)?.description}
+            </p>
+          </div>
+
+          {/* 風格選擇 */}
+          <div className="mb-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              文案風格
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStyle(s.value)}
+                  className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                    style === s.value
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-2 border-purple-500'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-2 border-transparent hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {s.emoji} {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <textarea
             value={productDescription}
             onChange={(e) => setProductDescription(e.target.value)}
-            placeholder="描述你的商品或服務...&#10;例如：手工皂禮盒，天然植物萃取，適合送禮"
+            placeholder="描述你的商品或服務...&#10;例如：手工皂禮盒，天然植物萃取，適合送禮&#10;&#10;提示：描述越詳細，生成的文案越精準！"
             className="w-full h-32 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none mb-4"
           />
 
@@ -174,63 +356,30 @@ export default function AIStudioPage() {
       )}
 
       {/* 生成結果 */}
-      {generatedCopy && (
+      {generatedResult && (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              生成結果
+              🎯 生成結果
             </h2>
-            <Button variant="outline" size="sm" onClick={handleGenerate}>
-              <RefreshCw className="w-4 h-4 mr-1" />
+            <Button variant="outline" size="sm" onClick={handleGenerate} disabled={isGenerating}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
               重新生成
             </Button>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                標題
-              </h3>
-              {generatedCopy.headlines.map((headline, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2"
-                >
-                  <span className="text-gray-900 dark:text-white">{headline}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopy(headline)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+          {isAllPlatform(generatedResult) ? (
+            <div className="space-y-8">
+              <GoogleAdsResults result={generatedResult.google} />
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <MetaAdsResults result={generatedResult.meta} />
+              </div>
             </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                描述
-              </h3>
-              {generatedCopy.descriptions.map((desc, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2"
-                >
-                  <span className="text-gray-900 dark:text-white text-sm">
-                    {desc}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopy(desc)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : isMeta(generatedResult) ? (
+            <MetaAdsResults result={generatedResult} />
+          ) : (
+            <GoogleAdsResults result={generatedResult as GoogleAdsResult} />
+          )}
         </div>
       )}
 
