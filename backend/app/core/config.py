@@ -66,6 +66,16 @@ class Settings(BaseSettings):
     AI_MAX_TOKENS: int = 4096
     AI_TEMPERATURE: float = 0.7
 
+    # DeepSeek API 設定（AI 文案生成）
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+
+    # Cloudflare AI Gateway 設定
+    CF_AI_GATEWAY_ACCOUNT_ID: Optional[str] = None
+    CF_AI_GATEWAY_ID: Optional[str] = None
+    CF_AI_GATEWAY_TOKEN: Optional[str] = None
+    CF_AI_GATEWAY_ENABLED: bool = False
+
     @property
     def cors_origins(self) -> list[str]:
         """取得 CORS origins 列表，支援逗號分隔字串格式"""
