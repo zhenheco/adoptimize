@@ -22,7 +22,13 @@ from sqlalchemy.orm import selectinload
 from app.db.base import get_db
 from app.models.health_audit import HealthAudit
 from app.models.audit_issue import AuditIssue
-from app.workers.run_health_audit import run_health_audit, run_full_audit
+
+# 條件導入 Celery 任務（Celery 已棄用，改用 APScheduler）
+try:
+    from app.workers.run_health_audit import run_health_audit, run_full_audit
+except ImportError:
+    run_health_audit = None
+    run_full_audit = None
 
 router = APIRouter()
 
@@ -109,6 +115,13 @@ async def trigger_audit(request: TriggerAuditRequest) -> TriggerAuditResponse:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid account_id format",
+            )
+
+        # 檢查 Celery 是否可用（已改用 APScheduler）
+        if run_health_audit is None or run_full_audit is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Background task service unavailable. Please use the new scheduler.",
             )
 
         # 選擇執行初始健檢或完整健檢
