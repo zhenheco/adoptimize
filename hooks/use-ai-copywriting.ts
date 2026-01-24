@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { api } from '@/lib/api/client';
 
 interface CopywritingResult {
   headlines: string[];
@@ -18,12 +17,26 @@ export function useAICopywriting() {
     setError(null);
 
     try {
-      const response = await api.post<CopywritingResult>('/ai/copywriting', {
-        product_description: productDescription,
-        style,
+      // 使用相對路徑呼叫 Next.js API 路由（代理到後端）
+      const res = await fetch('/api/v1/ai/copywriting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_description: productDescription,
+          style,
+        }),
       });
-      setResult(response);
-      return response;
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.error || '生成失敗');
+      }
+
+      setResult(data);
+      return data as CopywritingResult;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('生成失敗');
       setError(error);
