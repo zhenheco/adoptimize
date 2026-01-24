@@ -26,7 +26,12 @@ from app.db.base import get_db
 from app.middleware.auth import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.services.token_manager import TokenManager
-from app.workers.run_health_audit import run_health_audit
+
+# 條件導入 Celery 任務（Celery 已棄用，改用 APScheduler）
+try:
+    from app.workers.run_health_audit import run_health_audit
+except ImportError:
+    run_health_audit = None
 
 router = APIRouter()
 
@@ -280,12 +285,14 @@ async def oauth_callback(
         )
 
         # 觸發健檢任務（背景執行）
-        try:
-            audit_task = run_health_audit.delay(str(account_id))
-            audit_task_id = audit_task.id
-        except Exception:
-            # Celery 可能未啟動，跳過健檢任務
-            audit_task_id = None
+        audit_task_id = None
+        if run_health_audit is not None:
+            try:
+                audit_task = run_health_audit.delay(str(account_id))
+                audit_task_id = audit_task.id
+            except Exception:
+                # Celery 可能未啟動，跳過健檢任務
+                pass
 
         return CallbackResponse(
             success=True,
