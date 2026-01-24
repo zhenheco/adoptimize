@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user
+from app.middleware.auth import get_current_user
 from app.db.session import get_async_session
 from app.models.ad_account import AdAccount
 from app.models.autopilot_log import AutopilotLog

@@ -6,7 +6,7 @@ AI 文案生成 API 路由
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.core.auth import get_current_user
+from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.services.ai_copywriting_service import AICopywritingService
 
