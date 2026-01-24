@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.middleware.auth import get_current_user
-from app.db.session import get_async_session
+from app.db.base import get_db
 from app.models.report import Report
 from app.models.user import User
 
@@ -55,7 +55,7 @@ async def list_reports(
     limit: int = 20,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> list[ReportListItem]:
     """
     取得報告列表
@@ -91,7 +91,7 @@ async def list_reports(
 async def get_report(
     report_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> ReportDetail:
     """
     取得報告詳情

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.middleware.auth import get_current_user
-from app.db.session import get_async_session
+from app.db.base import get_db
 from app.models.ad_account import AdAccount
 from app.models.autopilot_log import AutopilotLog
 from app.models.user import User
@@ -51,7 +51,7 @@ class AutopilotLogResponse(BaseModel):
 @router.get("/settings")
 async def get_autopilot_settings(
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> AutopilotStatusResponse:
     """
     取得自動駕駛設定
@@ -92,7 +92,7 @@ async def get_autopilot_settings(
 async def update_autopilot_settings(
     settings: AutopilotSettingsSchema,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     更新自動駕駛設定
@@ -116,7 +116,7 @@ async def update_autopilot_settings(
 @router.post("/toggle")
 async def toggle_autopilot(
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     啟用/停用自動駕駛
@@ -145,7 +145,7 @@ async def get_autopilot_logs(
     limit: int = 20,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ) -> list[AutopilotLogResponse]:
     """
     取得自動駕駛執行記錄
