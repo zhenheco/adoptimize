@@ -262,7 +262,7 @@ describe('ExclusionSuggestion', () => {
     });
 
     it('should show loading state during execution', async () => {
-      const handleExecute = vi.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      const handleExecute = vi.fn((): Promise<void> => new Promise((resolve) => setTimeout(resolve, 100)));
       render(
         <ExclusionSuggestion
           pair={highOverlapPair}

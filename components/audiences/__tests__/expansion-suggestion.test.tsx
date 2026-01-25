@@ -322,7 +322,7 @@ describe('ExpansionSuggestion', () => {
     });
 
     it('should show loading state during creation', async () => {
-      const handleCreate = vi.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      const handleCreate = vi.fn((): Promise<void> => new Promise((resolve) => setTimeout(resolve, 100)));
       render(
         <ExpansionSuggestion
           audience={highPerformingSmall}
