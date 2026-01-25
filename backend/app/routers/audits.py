@@ -19,9 +19,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.logger import get_logger
 from app.db.base import get_db
 from app.models.health_audit import HealthAudit
 from app.models.audit_issue import AuditIssue
+
+logger = get_logger(__name__)
 
 # 條件導入 Celery 任務（Celery 已棄用，改用 APScheduler）
 try:
@@ -141,9 +144,10 @@ async def trigger_audit(request: TriggerAuditRequest) -> TriggerAuditResponse:
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to schedule audit: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to schedule audit: {str(e)}",
+            detail="Failed to schedule audit - please try again later",
         )
 
 

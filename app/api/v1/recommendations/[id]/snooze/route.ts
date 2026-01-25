@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Python 後端 URL
+const PYTHON_API = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
+
 /**
  * POST /api/v1/recommendations/:id/snooze
  * 延後處理建議
@@ -21,28 +24,37 @@ export async function POST(
       );
     }
 
-    // TODO: 呼叫 Python 後端 API 更新建議狀態
-    // 目前只回傳成功狀態
-
-    console.log(`Snoozing recommendation: ${id} until ${snooze_until}`);
-
-    // 模擬處理時間
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id,
-        status: 'snoozed',
-        snooze_until,
-        snoozed_at: new Date().toISOString(),
-      },
+    // 呼叫 Python 後端 API
+    const response = await fetch(`${PYTHON_API}/api/v1/recommendations/${id}/snooze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snooze_until }),
     });
-  } catch (error) {
-    console.error('Snooze API Error:', error);
+
+    if (response.ok) {
+      const data = await response.json();
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: data.recommendation_id,
+          status: data.new_status,
+          snooze_until,
+          snoozed_at: new Date().toISOString(),
+        },
+      });
+    }
+
+    // 處理後端錯誤
+    const errorData = await response.json().catch(() => ({}));
     return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '延後操作失敗' } },
-      { status: 500 }
+      { error: { code: 'BACKEND_ERROR', message: errorData.detail || '延後操作失敗' } },
+      { status: response.status }
+    );
+  } catch {
+    // 後端不可用時的 fallback
+    return NextResponse.json(
+      { error: { code: 'SERVICE_UNAVAILABLE', message: '服務暫時無法使用' } },
+      { status: 503 }
     );
   }
 }

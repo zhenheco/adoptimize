@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Python 後端 URL
+const PYTHON_API = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
+
 /**
  * POST /api/v1/recommendations/:id/execute
  * 執行建議
@@ -10,20 +13,37 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  // TODO: 呼叫 Python 後端 API 實際執行建議
-  // 目前只回傳成功狀態
+  try {
+    // 呼叫 Python 後端 API
+    const response = await fetch(`${PYTHON_API}/api/v1/recommendations/${id}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-  console.log(`Executing recommendation: ${id}`);
+    if (response.ok) {
+      const data = await response.json();
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: data.recommendation_id,
+          status: data.new_status,
+          executed_at: data.executed_at,
+          remaining_actions: data.remaining_actions,
+        },
+      });
+    }
 
-  // 模擬處理時間
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  return NextResponse.json({
-    success: true,
-    data: {
-      id,
-      status: 'executed',
-      executed_at: new Date().toISOString(),
-    },
-  });
+    // 處理後端錯誤
+    const errorData = await response.json().catch(() => ({}));
+    return NextResponse.json(
+      { error: { code: 'BACKEND_ERROR', message: errorData.detail || '執行失敗' } },
+      { status: response.status }
+    );
+  } catch {
+    // 後端不可用時的 fallback
+    return NextResponse.json(
+      { error: { code: 'SERVICE_UNAVAILABLE', message: '服務暫時無法使用' } },
+      { status: 503 }
+    );
+  }
 }

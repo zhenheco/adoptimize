@@ -30,6 +30,7 @@ from app.routers import (
     creatives,
     dashboard,
     health,
+    history,
     notifications,
     oauth_google,
     oauth_meta,
@@ -129,6 +130,13 @@ api_router.include_router(
     notifications.router,
     prefix="/notifications",
     tags=["Notifications"],
+)
+
+# 操作歷史路由
+api_router.include_router(
+    history.router,
+    prefix="/history",
+    tags=["History"],
 )
 
 # OAuth 連接路由

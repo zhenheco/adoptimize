@@ -18,9 +18,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.logger import get_logger
 from app.models.ad_account import AdAccount
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 # Google OAuth 端點
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -134,7 +136,7 @@ class TokenManager:
                 return True
 
         except Exception as e:
-            print(f"Failed to refresh Google token: {e}")
+            logger.error(f"Failed to refresh Google token: {e}")
             return False
 
     async def refresh_meta_token(self, account: AdAccount) -> bool:
@@ -184,7 +186,7 @@ class TokenManager:
                 return True
 
         except Exception as e:
-            print(f"Failed to refresh Meta token: {e}")
+            logger.error(f"Failed to refresh Meta token: {e}")
             return False
 
     async def update_tokens(
@@ -226,7 +228,7 @@ class TokenManager:
             return True
 
         except Exception as e:
-            print(f"Failed to update tokens: {e}")
+            logger.error(f"Failed to update tokens: {e}")
             await self.db.rollback()
             return False
 
@@ -313,6 +315,6 @@ class TokenManager:
             return True
 
         except Exception as e:
-            print(f"Failed to delete account: {e}")
+            logger.error(f"Failed to delete account: {e}")
             await self.db.rollback()
             return False

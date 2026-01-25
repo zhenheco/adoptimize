@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Python 後端 URL
-const PYTHON_API = process.env.PYTHON_API_URL || 'http://localhost:8000';
+const PYTHON_API = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
 /**
  * POST /api/v1/history/revert
@@ -21,39 +21,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 嘗試呼叫 Python 後端
-    try {
-      const response = await fetch(`${PYTHON_API}/api/v1/history/${id}/revert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+    // 呼叫 Python 後端
+    const response = await fetch(`${PYTHON_API}/api/v1/history/${id}/revert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        return NextResponse.json(data);
-      }
-    } catch {
-      // Python 後端不可用，使用模擬回應
+    if (response.ok) {
+      const data = await response.json();
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: data.id,
+          reverted: data.reverted,
+          reverted_at: data.reverted_at,
+        },
+      });
     }
 
-    // 模擬處理時間
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    console.log(`Reverting action history: ${id}`);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id,
-        reverted: true,
-        reverted_at: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    console.error('History Revert API Error:', error);
+    // 處理後端錯誤
+    const errorData = await response.json().catch(() => ({}));
     return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: '還原操作失敗' } },
-      { status: 500 }
+      { error: { code: 'BACKEND_ERROR', message: errorData.detail || '還原操作失敗' } },
+      { status: response.status }
+    );
+  } catch {
+    // 後端不可用時的 fallback
+    return NextResponse.json(
+      { error: { code: 'SERVICE_UNAVAILABLE', message: '服務暫時無法使用' } },
+      { status: 503 }
     );
   }
 }

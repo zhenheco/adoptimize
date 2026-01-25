@@ -8,9 +8,6 @@ Google Ads OAuth 路由
 3. 刷新 Token
 """
 
-import base64
-import json
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
@@ -22,10 +19,14 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings, Settings
+from app.core.logger import get_logger
 from app.db.base import get_db
 from app.middleware.auth import get_current_user, get_current_user_optional
 from app.models.user import User
+from app.services.csrf_protection import generate_oauth_state, verify_oauth_state
 from app.services.token_manager import TokenManager
+
+logger = get_logger(__name__)
 
 # 條件導入 Celery 任務（Celery 已棄用，改用 APScheduler）
 try:
@@ -98,9 +99,10 @@ async def exchange_code_for_tokens(
         )
 
         if response.status_code != 200:
+            logger.error(f"Google token exchange failed: {response.text}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Token exchange failed: {response.text}",
+                detail="Token exchange failed - please try again",
             )
 
         return response.json()
@@ -148,46 +150,17 @@ async def refresh_access_token(
         )
 
         if response.status_code != 200:
+            logger.error(f"Google token refresh failed: {response.text}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Token refresh failed: {response.text}",
+                detail="Token refresh failed - please try again",
             )
 
         return response.json()
 
 
-def encode_state(user_id: uuid.UUID) -> str:
-    """
-    將 user_id 編碼到 OAuth state 參數中
-
-    Args:
-        user_id: 用戶 ID
-
-    Returns:
-        編碼後的 state 字串
-    """
-    state_data = {
-        "nonce": uuid.uuid4().hex,  # CSRF 保護
-        "user_id": str(user_id),
-    }
-    return base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
-
-
-def decode_state(state: str) -> Optional[uuid.UUID]:
-    """
-    從 OAuth state 參數解碼 user_id
-
-    Args:
-        state: 編碼後的 state 字串
-
-    Returns:
-        用戶 ID 或 None（如果解碼失敗）
-    """
-    try:
-        state_data = json.loads(base64.urlsafe_b64decode(state))
-        return uuid.UUID(state_data.get("user_id"))
-    except (json.JSONDecodeError, ValueError, TypeError):
-        return None
+# encode_state 和 decode_state 已移至 app.services.csrf_protection
+# 使用 generate_oauth_state 和 verify_oauth_state 替代
 
 
 # API 端點
@@ -211,8 +184,8 @@ async def get_auth_url(
             detail="Google Ads client ID not configured",
         )
 
-    # 產生 state，包含 user_id 用於回調時識別用戶
-    state = encode_state(current_user.id)
+    # 產生 state，包含 user_id 和 nonce 用於回調時識別用戶並防止 CSRF
+    state = await generate_oauth_state(current_user.id, "google")
 
     # 建構授權 URL 參數
     params = {
@@ -248,12 +221,13 @@ async def oauth_callback(
     從 state 參數中解碼 user_id。
     """
     try:
-        # 從 state 解碼 user_id
-        user_id = decode_state(state)
-        if not user_id:
+        # 驗證 state 並取得 user_id（使用 Redis 驗證 nonce 防止 CSRF）
+        is_valid, user_id, error_msg = await verify_oauth_state(state, "google")
+        if not is_valid or not user_id:
+            logger.warning(f"Google OAuth state verification failed: {error_msg}")
             return CallbackResponse(
                 success=False,
-                error="Invalid state parameter - unable to identify user",
+                error=error_msg or "Invalid state parameter - unable to identify user",
             )
 
         # 交換授權碼取得 tokens
@@ -290,9 +264,9 @@ async def oauth_callback(
             try:
                 audit_task = run_health_audit.delay(str(account_id))
                 audit_task_id = audit_task.id
-            except Exception:
-                # Celery 可能未啟動，跳過健檢任務
-                pass
+            except Exception as e:
+                # Celery 可能未啟動，記錄但不中斷流程
+                logger.warning(f"Failed to trigger health audit for account {account_id}: {e}")
 
         return CallbackResponse(
             success=True,

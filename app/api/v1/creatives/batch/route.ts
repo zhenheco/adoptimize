@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 嘗試代理到 Python 後端
-    const pythonApiUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    const pythonApiUrl = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
     try {
       const pythonResponse = await fetch(`${pythonApiUrl}/api/v1/creatives/batch`, {
@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // Python 後端不可用時使用模擬邏輯
-      console.log('[Batch API] Python backend unavailable, using mock response');
     }
 
     // 模擬批次操作結果（當後端不可用時）
@@ -105,8 +104,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('[Batch API] Error:', error);
-
     return NextResponse.json(
       {
         error: {

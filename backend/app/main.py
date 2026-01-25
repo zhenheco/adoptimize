@@ -13,24 +13,27 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.exceptions import AdOptimizeError
+from app.core.logger import get_logger, setup_logging as setup_app_logging
 from app.core.scheduler import setup_scheduler, shutdown_scheduler
 from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.routers import api_router
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """應用程式生命週期管理"""
     # 啟動時執行
+    setup_app_logging()
     setup_logging(level=settings.LOG_LEVEL)
-    print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     setup_scheduler()
     yield
     # 關閉時執行
     shutdown_scheduler()
-    print(f"👋 Shutting down {settings.APP_NAME}")
+    logger.info(f"Shutting down {settings.APP_NAME}")
 
 
 app = FastAPI(

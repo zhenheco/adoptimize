@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Python 後端 URL
-const PYTHON_API = process.env.PYTHON_API_URL || 'http://localhost:8000';
+const PYTHON_API = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
 /**
  * GET /api/v1/history

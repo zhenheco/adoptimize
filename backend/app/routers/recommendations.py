@@ -424,6 +424,75 @@ async def ignore_recommendation(
     )
 
 
+class SnoozeRequest(BaseModel):
+    """延後請求"""
+    snooze_until: str = Field(..., description="延後到的時間 (ISO 8601 格式)")
+
+
+@router.post("/{recommendation_id}/snooze", response_model=RecommendationActionResponse)
+async def snooze_recommendation(
+    recommendation_id: str,
+    request: SnoozeRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RecommendationActionResponse:
+    """
+    延後處理建議
+
+    Args:
+        recommendation_id: 建議 ID
+        request: 包含延後時間的請求
+        db: 資料庫 session
+
+    Returns:
+        RecommendationActionResponse: 操作結果
+    """
+    # 驗證 ID 格式
+    try:
+        rec_uuid = uuid.UUID(recommendation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recommendation ID format")
+
+    # 解析延後時間
+    try:
+        snooze_until = datetime.fromisoformat(request.snooze_until.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid snooze_until format")
+
+    # 從資料庫取得建議
+    try:
+        result = await db.execute(
+            select(RecommendationDBModel).where(RecommendationDBModel.id == rec_uuid)
+        )
+        rec_record = result.scalar_one_or_none()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database connection failed in snooze_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
+
+    if not rec_record:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    # 更新建議狀態和延後資訊
+    try:
+        rec_record.status = "snoozed"
+        # 使用 action_params 存儲延後資訊
+        current_params = rec_record.action_params or {}
+        current_params["snooze_until"] = request.snooze_until
+        rec_record.action_params = current_params
+        await db.flush()
+    except Exception as e:
+        import logging
+        logging.warning(f"Database update failed in snooze_recommendation: {e}")
+        raise HTTPException(status_code=503, detail="Database service unavailable")
+
+    return RecommendationActionResponse(
+        success=True,
+        recommendation_id=recommendation_id,
+        new_status="snoozed",
+        message=f"建議已延後到 {request.snooze_until}",
+    )
+
+
 @router.get("/history/all", response_model=ActionHistoryResponse)
 async def get_action_history(
     page: int = Query(1, ge=1, description="頁碼"),

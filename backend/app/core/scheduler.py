@@ -13,6 +13,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 scheduler = AsyncIOScheduler()
 
 
@@ -105,9 +108,9 @@ def setup_scheduler():
     )
 
     scheduler.start()
-    print("📅 APScheduler started with jobs:")
+    logger.info("APScheduler started with jobs:")
     for job in scheduler.get_jobs():
-        print(f"   - {job.name} ({job.id})")
+        logger.info(f"  - {job.name} ({job.id})")
 
 
 def shutdown_scheduler():
@@ -115,4 +118,4 @@ def shutdown_scheduler():
     關閉排程器
     """
     scheduler.shutdown(wait=False)
-    print("📅 APScheduler shutdown")
+    logger.info("APScheduler shutdown")
