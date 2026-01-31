@@ -34,6 +34,7 @@ from app.routers import (
     notifications,
     oauth_google,
     oauth_meta,
+    oauth_tiktok,
     recommendations,
     reports,
     suggestions,
@@ -150,4 +151,10 @@ api_router.include_router(
     oauth_meta.router,
     prefix="/accounts/connect/meta",
     tags=["OAuth - Meta"],
+)
+
+api_router.include_router(
+    oauth_tiktok.router,
+    prefix="/accounts/connect/tiktok",
+    tags=["OAuth - TikTok"],
 )

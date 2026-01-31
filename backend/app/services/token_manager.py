@@ -311,7 +311,7 @@ class TokenManager:
         external_id: str,
         name: str,
         access_token: str,
-        refresh_token: str,
+        refresh_token: Optional[str],
         expires_in: int,
     ) -> uuid.UUID:
         """
@@ -337,7 +337,7 @@ class TokenManager:
             external_id=external_id,
             name=name,
             access_token=access_token,
-            refresh_token=refresh_token,
+            refresh_token=refresh_token or "",
             token_expires_at=expires_at,
             status="active",
         )
