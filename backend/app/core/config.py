@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     META_APP_SECRET: Optional[str] = None
     META_ACCESS_TOKEN: Optional[str] = None
 
+    # TikTok Marketing API 設定
+    TIKTOK_APP_ID: Optional[str] = None
+    TIKTOK_APP_SECRET: Optional[str] = None
+
     # CORS 設定 (存為字串，支援逗號分隔格式)
     CORS_ORIGINS: str = "http://localhost:3000"
 
