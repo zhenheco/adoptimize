@@ -26,7 +26,7 @@ type AccountStatus = 'connected' | 'expired' | 'error';
  */
 interface AdAccount {
   id: string;
-  platform: 'google' | 'meta' | 'tiktok';
+  platform: 'google' | 'meta' | 'tiktok' | 'reddit';
   name: string;
   accountId: string;
   status: AccountStatus;
@@ -62,6 +62,12 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
       text: 'text-white dark:text-gray-100',
       label: 'TikTok Ads',
       icon: 'T',
+    },
+    reddit: {
+      bg: 'bg-orange-600 dark:bg-orange-700',
+      text: 'text-white dark:text-gray-100',
+      label: 'Reddit Ads',
+      icon: 'R',
     },
   };
 
@@ -199,7 +205,7 @@ function AccountsContent() {
             last_synced_at: string;
           }) => ({
             id: acc.id,
-            platform: acc.platform as 'google' | 'meta' | 'tiktok',
+            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit',
             name: acc.name,
             accountId: acc.external_id,
             status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
@@ -227,6 +233,7 @@ function AccountsContent() {
         google: 'Google Ads',
         meta: 'Meta Ads',
         tiktok: 'TikTok Ads',
+        reddit: 'Reddit Ads',
       };
       const platform = platformNames[success] || success;
       setToast({
@@ -343,6 +350,37 @@ function AccountsContent() {
   };
 
   /**
+   * 連結 Reddit 帳戶
+   */
+  const handleConnectReddit = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/reddit', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
+      } else {
+        const error = await response.json();
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
+      }
+    } catch (error) {
+      console.error('Connect Reddit error:', error);
+      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+    }
+  };
+
+  /**
    * 同步帳戶資料
    */
   const handleRefresh = (id: string) => {
@@ -416,7 +454,7 @@ function AccountsContent() {
             <div>
               <CardTitle className="text-lg">連結新帳戶</CardTitle>
               <CardDescription>
-                連結您的 Google Ads、Meta 或 TikTok 廣告帳戶以開始優化
+                連結您的 Google Ads、Meta、TikTok 或 Reddit 廣告帳戶以開始優化
               </CardDescription>
             </div>
           </div>
@@ -438,6 +476,14 @@ function AccountsContent() {
             >
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 TikTok Ads
+            </Button>
+            <Button
+              onClick={handleConnectReddit}
+              variant="outline"
+              className="flex-1 min-w-[150px] bg-orange-600 text-white hover:bg-orange-700 border-orange-600"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              連結 Reddit Ads
             </Button>
           </div>
         </CardContent>
