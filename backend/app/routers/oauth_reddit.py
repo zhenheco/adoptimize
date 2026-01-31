@@ -107,3 +107,147 @@ async def get_auth_url(
     auth_url = f"{REDDIT_AUTH_URL}?{urlencode(params)}"
 
     return AuthUrlResponse(auth_url=auth_url, state=state)
+
+
+async def exchange_code_for_tokens(
+    code: str,
+    redirect_uri: str,
+    settings: Settings,
+) -> dict:
+    """
+    使用授權碼交換 access token 和 refresh token
+
+    Reddit 使用 Basic Auth (client_id:secret) 進行認證
+    """
+    # Mock 模式
+    if is_mock_mode():
+        return {
+            "access_token": f"mock_reddit_access_{code[:8]}",
+            "refresh_token": f"mock_reddit_refresh_{code[:8]}",
+            "expires_in": 3600,
+            "scope": " ".join(REDDIT_SCOPES),
+        }
+
+    # 真實 API 呼叫 - Reddit 使用 Basic Auth
+    import base64
+    credentials = base64.b64encode(
+        f"{settings.REDDIT_CLIENT_ID}:{settings.REDDIT_CLIENT_SECRET}".encode()
+    ).decode()
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            REDDIT_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "AdOptimize/1.0",
+            },
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Reddit token exchange failed: {response.text}")
+            raise HTTPException(
+                status_code=400,
+                detail="Token exchange failed - please try again",
+            )
+
+        data = response.json()
+
+        if "error" in data:
+            raise HTTPException(
+                status_code=400,
+                detail=data.get("error_description", data.get("error")),
+            )
+
+        return {
+            "access_token": data.get("access_token"),
+            "refresh_token": data.get("refresh_token"),
+            "expires_in": data.get("expires_in", 3600),
+            "scope": data.get("scope", ""),
+        }
+
+
+@router.get("/callback", response_model=CallbackResponse)
+async def oauth_callback(
+    code: Optional[str] = Query(None, description="Reddit OAuth 授權碼"),
+    state: str = Query(..., description="CSRF 保護 state"),
+    error: Optional[str] = Query(None, description="OAuth 錯誤代碼"),
+    error_description: Optional[str] = Query(None, description="OAuth 錯誤描述"),
+    redirect_uri: str = Query(
+        "http://localhost:3000/api/v1/accounts/callback/reddit",
+        description="原始重定向 URI",
+    ),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> CallbackResponse:
+    """處理 Reddit OAuth 回調"""
+    try:
+        # 處理 OAuth 錯誤
+        if error:
+            error_msg = error_description or error
+            logger.warning(f"Reddit OAuth error: {error_msg}")
+            return CallbackResponse(
+                success=False,
+                error=f"Authorization denied: {error_msg}",
+            )
+
+        if not code:
+            return CallbackResponse(
+                success=False,
+                error="No authorization code received",
+            )
+
+        # 驗證 state 並取得 user_id
+        is_valid, user_id, error_msg = await verify_oauth_state(state, "reddit")
+        if not is_valid or not user_id:
+            logger.warning(f"Reddit OAuth state verification failed: {error_msg}")
+            return CallbackResponse(
+                success=False,
+                error=error_msg or "Invalid state parameter",
+            )
+
+        # 交換授權碼取得 tokens
+        tokens = await exchange_code_for_tokens(code, redirect_uri, settings)
+
+        access_token = tokens.get("access_token")
+        refresh_token = tokens.get("refresh_token")
+        expires_in = tokens.get("expires_in", 3600)
+
+        if not access_token:
+            return CallbackResponse(
+                success=False,
+                error="No access token received",
+            )
+
+        # 使用 TokenManager 儲存帳戶到資料庫
+        token_manager = TokenManager(db)
+        external_id = f"reddit_user_{user_id.hex[:8]}"
+
+        account_id = await token_manager.save_new_account(
+            user_id=user_id,
+            platform="reddit",
+            external_id=external_id,
+            name=f"Reddit Ads - {external_id}",
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=expires_in,
+        )
+
+        return CallbackResponse(
+            success=True,
+            account_id=str(account_id),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reddit OAuth callback error: {e}")
+        return CallbackResponse(
+            success=False,
+            error=str(e),
+        )

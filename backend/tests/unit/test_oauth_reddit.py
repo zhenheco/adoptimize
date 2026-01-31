@@ -84,3 +84,95 @@ class TestGetAuthUrl:
 
         assert exc_info.value.status_code == 500
         assert "not configured" in exc_info.value.detail.lower()
+
+
+class TestOAuthCallback:
+    """測試 OAuth 回調處理"""
+
+    @pytest.mark.asyncio
+    async def test_callback_success_mock_mode(self):
+        """Mock 模式下成功處理回調"""
+        from app.routers.oauth_reddit import oauth_callback, CallbackResponse
+
+        mock_settings = MagicMock()
+        mock_settings.REDDIT_CLIENT_ID = "test_client_id"
+        mock_settings.REDDIT_CLIENT_SECRET = "test_secret"
+
+        mock_db = MagicMock()
+
+        user_id = uuid4()
+        account_id = uuid4()
+
+        with patch("app.routers.oauth_reddit.verify_oauth_state", new_callable=AsyncMock) as mock_verify:
+            mock_verify.return_value = (True, user_id, None)
+
+            with patch("app.routers.oauth_reddit.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange:
+                mock_exchange.return_value = {
+                    "access_token": "mock_access_token",
+                    "refresh_token": "mock_refresh_token",
+                    "expires_in": 3600,
+                }
+
+                with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
+                    mock_tm = MagicMock()
+                    mock_tm.save_new_account = AsyncMock(return_value=account_id)
+                    MockTokenManager.return_value = mock_tm
+
+                    result = await oauth_callback(
+                        code="test_auth_code",
+                        state="test_state",
+                        error=None,
+                        error_description=None,
+                        redirect_uri="http://localhost:3000/callback",
+                        db=mock_db,
+                        settings=mock_settings,
+                    )
+
+                    assert isinstance(result, CallbackResponse)
+                    assert result.success is True
+                    assert result.account_id == str(account_id)
+
+    @pytest.mark.asyncio
+    async def test_callback_fails_with_invalid_state(self):
+        """無效 state 應返回錯誤"""
+        from app.routers.oauth_reddit import oauth_callback
+
+        mock_settings = MagicMock()
+        mock_db = MagicMock()
+
+        with patch("app.routers.oauth_reddit.verify_oauth_state", new_callable=AsyncMock) as mock_verify:
+            mock_verify.return_value = (False, None, "Invalid state")
+
+            result = await oauth_callback(
+                code="test_code",
+                state="invalid_state",
+                error=None,
+                error_description=None,
+                redirect_uri="http://localhost:3000/callback",
+                db=mock_db,
+                settings=mock_settings,
+            )
+
+            assert result.success is False
+            assert "Invalid state" in result.error
+
+    @pytest.mark.asyncio
+    async def test_callback_handles_error_param(self):
+        """OAuth 錯誤參數應正確處理"""
+        from app.routers.oauth_reddit import oauth_callback
+
+        mock_settings = MagicMock()
+        mock_db = MagicMock()
+
+        result = await oauth_callback(
+            code=None,
+            state="test_state",
+            error="access_denied",
+            error_description="User denied access",
+            redirect_uri="http://localhost:3000/callback",
+            db=mock_db,
+            settings=mock_settings,
+        )
+
+        assert result.success is False
+        assert "denied" in result.error.lower()
