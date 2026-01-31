@@ -26,7 +26,7 @@ type AccountStatus = 'connected' | 'expired' | 'error';
  */
 interface AdAccount {
   id: string;
-  platform: 'google' | 'meta';
+  platform: 'google' | 'meta' | 'tiktok';
   name: string;
   accountId: string;
   status: AccountStatus;
@@ -49,11 +49,19 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
       bg: 'bg-red-100 dark:bg-red-900/30',
       text: 'text-red-600 dark:text-red-400',
       label: 'Google Ads',
+      icon: 'G',
     },
     meta: {
       bg: 'bg-blue-100 dark:bg-blue-900/30',
       text: 'text-blue-600 dark:text-blue-400',
       label: 'Meta Ads',
+      icon: 'M',
+    },
+    tiktok: {
+      bg: 'bg-gray-900 dark:bg-gray-800',
+      text: 'text-white dark:text-gray-100',
+      label: 'TikTok Ads',
+      icon: 'T',
     },
   };
 
@@ -103,7 +111,7 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
               className={`w-12 h-12 rounded-xl flex items-center justify-center ${style.bg}`}
             >
               <span className={`font-bold text-lg ${style.text}`}>
-                {account.platform === 'google' ? 'G' : 'M'}
+                {style.icon}
               </span>
             </div>
 
@@ -191,7 +199,7 @@ function AccountsContent() {
             last_synced_at: string;
           }) => ({
             id: acc.id,
-            platform: acc.platform as 'google' | 'meta',
+            platform: acc.platform as 'google' | 'meta' | 'tiktok',
             name: acc.name,
             accountId: acc.external_id,
             status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
@@ -215,7 +223,12 @@ function AccountsContent() {
     const accountId = searchParams.get('account_id');
 
     if (success) {
-      const platform = success === 'google' ? 'Google Ads' : 'Meta Ads';
+      const platformNames: Record<string, string> = {
+        google: 'Google Ads',
+        meta: 'Meta Ads',
+        tiktok: 'TikTok Ads',
+      };
+      const platform = platformNames[success] || success;
       setToast({
         type: 'success',
         message: `成功連結 ${platform} 帳戶${accountId ? ` (${accountId})` : ''}`,
@@ -299,6 +312,37 @@ function AccountsContent() {
   };
 
   /**
+   * 連結 TikTok 帳戶
+   */
+  const handleConnectTikTok = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/tiktok', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
+      } else {
+        const error = await response.json();
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
+      }
+    } catch (error) {
+      console.error('Connect TikTok error:', error);
+      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+    }
+  };
+
+  /**
    * 同步帳戶資料
    */
   const handleRefresh = (id: string) => {
@@ -372,20 +416,28 @@ function AccountsContent() {
             <div>
               <CardTitle className="text-lg">連結新帳戶</CardTitle>
               <CardDescription>
-                連結您的 Google Ads 或 Meta 廣告帳戶以開始優化
+                連結您的 Google Ads、Meta 或 TikTok 廣告帳戶以開始優化
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <Button onClick={handleConnectGoogle} className="flex-1">
+          <div className="flex flex-wrap gap-4">
+            <Button onClick={handleConnectGoogle} className="flex-1 min-w-[150px]">
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 Google Ads
             </Button>
-            <Button onClick={handleConnectMeta} variant="outline" className="flex-1">
+            <Button onClick={handleConnectMeta} variant="outline" className="flex-1 min-w-[150px]">
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 Meta Ads
+            </Button>
+            <Button
+              onClick={handleConnectTikTok}
+              variant="outline"
+              className="flex-1 min-w-[150px] bg-gray-900 text-white hover:bg-gray-800 border-gray-900"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              連結 TikTok Ads
             </Button>
           </div>
         </CardContent>
