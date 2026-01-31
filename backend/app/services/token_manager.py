@@ -30,6 +30,9 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 # Meta OAuth 端點
 META_TOKEN_URL = "https://graph.facebook.com/v18.0/oauth/access_token"
 
+# TikTok OAuth 端點
+TIKTOK_REFRESH_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/refresh_token/"
+
 
 class TokenManager:
     """Token 管理器"""
@@ -137,6 +140,75 @@ class TokenManager:
 
         except Exception as e:
             logger.error(f"Failed to refresh Google token: {e}")
+            return False
+
+    async def refresh_tiktok_token(self, account: AdAccount) -> bool:
+        """
+        刷新 TikTok OAuth Token
+
+        TikTok refresh token 有效期 365 天，access token 24 小時。
+
+        Args:
+            account: 廣告帳戶
+
+        Returns:
+            是否刷新成功
+        """
+        import os
+
+        if not account.refresh_token:
+            return False
+
+        # Mock 模式
+        if os.getenv("USE_MOCK_ADS_API", "true").lower() == "true":
+            new_access_token = f"mock_refreshed_tiktok_{account.external_id}"
+            await self.update_tokens(
+                account_id=account.id,
+                access_token=new_access_token,
+                expires_in=86400,
+            )
+            return True
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    TIKTOK_REFRESH_URL,
+                    json={
+                        "app_id": settings.TIKTOK_APP_ID,
+                        "secret": settings.TIKTOK_APP_SECRET,
+                        "refresh_token": account.refresh_token,
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+
+                if response.status_code != 200:
+                    logger.error(f"TikTok token refresh failed: {response.text}")
+                    return False
+
+                data = response.json()
+                if data.get("code") != 0:
+                    logger.error(f"TikTok token refresh error: {data}")
+                    return False
+
+                token_data = data.get("data", {})
+                new_access_token = token_data.get("access_token")
+                new_refresh_token = token_data.get("refresh_token")
+                expires_in = token_data.get("expires_in", 86400)
+
+                if not new_access_token:
+                    return False
+
+                await self.update_tokens(
+                    account_id=account.id,
+                    access_token=new_access_token,
+                    refresh_token=new_refresh_token,
+                    expires_in=expires_in,
+                )
+
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to refresh TikTok token: {e}")
             return False
 
     async def refresh_meta_token(self, account: AdAccount) -> bool:

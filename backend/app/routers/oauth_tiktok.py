@@ -34,6 +34,7 @@ router = APIRouter()
 # TikTok OAuth 端點
 TIKTOK_AUTH_URL = "https://business-api.tiktok.com/portal/auth"
 TIKTOK_TOKEN_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/"
+TIKTOK_REFRESH_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/refresh_token/"
 
 # TikTok Marketing API 所需的權限
 TIKTOK_SCOPES = [
@@ -238,6 +239,63 @@ async def oauth_callback(
     except Exception as e:
         logger.error(f"TikTok OAuth callback error: {e}")
         return CallbackResponse(
+            success=False,
+            error=str(e),
+        )
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh_token_endpoint(
+    request: RefreshTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RefreshTokenResponse:
+    """
+    刷新 TikTok OAuth Token
+
+    TikTok refresh token 有效期 365 天，access token 24 小時。
+    """
+    try:
+        token_manager = TokenManager(db)
+        account = await token_manager.get_account(UUID(request.account_id))
+
+        if not account:
+            raise HTTPException(
+                status_code=404,
+                detail="Account not found",
+            )
+
+        # 驗證帳戶屬於當前用戶
+        if account.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to refresh this account's token",
+            )
+
+        # 驗證是 TikTok 帳戶
+        if account.platform != "tiktok":
+            raise HTTPException(
+                status_code=400,
+                detail="This endpoint only supports TikTok accounts",
+            )
+
+        # 刷新 token
+        success = await token_manager.refresh_tiktok_token(account)
+
+        if not success:
+            return RefreshTokenResponse(
+                success=False,
+                error="Failed to refresh token - please reconnect the account",
+            )
+
+        return RefreshTokenResponse(success=True)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"TikTok token refresh error: {e}")
+        return RefreshTokenResponse(
             success=False,
             error=str(e),
         )
