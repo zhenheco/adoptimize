@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     TIKTOK_APP_ID: Optional[str] = None
     TIKTOK_APP_SECRET: Optional[str] = None
 
+    # Reddit Ads API 設定
+    REDDIT_CLIENT_ID: Optional[str] = None
+    REDDIT_CLIENT_SECRET: Optional[str] = None
+
     # CORS 設定 (存為字串，支援逗號分隔格式)
     CORS_ORIGINS: str = "http://localhost:3000"
 
