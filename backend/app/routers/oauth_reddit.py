@@ -251,3 +251,57 @@ async def oauth_callback(
             success=False,
             error=str(e),
         )
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh_token_endpoint(
+    request: RefreshTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RefreshTokenResponse:
+    """
+    刷新 Reddit OAuth Token
+
+    Reddit access token 有效期只有 1 小時，需要頻繁刷新。
+    """
+    try:
+        token_manager = TokenManager(db)
+        account = await token_manager.get_account(UUID(request.account_id))
+
+        if not account:
+            raise HTTPException(
+                status_code=404,
+                detail="Account not found",
+            )
+
+        if account.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to refresh this account's token",
+            )
+
+        if account.platform != "reddit":
+            raise HTTPException(
+                status_code=400,
+                detail="This endpoint only supports Reddit accounts",
+            )
+
+        success = await token_manager.refresh_reddit_token(account)
+
+        if not success:
+            return RefreshTokenResponse(
+                success=False,
+                error="Failed to refresh token - please reconnect the account",
+            )
+
+        return RefreshTokenResponse(success=True)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reddit token refresh error: {e}")
+        return RefreshTokenResponse(
+            success=False,
+            error=str(e),
+        )

@@ -176,3 +176,131 @@ class TestOAuthCallback:
 
         assert result.success is False
         assert "denied" in result.error.lower()
+
+
+class TestRefreshToken:
+    """測試 Token 刷新"""
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_success(self):
+        """成功刷新 token"""
+        from app.routers.oauth_reddit import refresh_token_endpoint, RefreshTokenRequest
+
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+
+        mock_account = MagicMock()
+        mock_account.id = uuid4()
+        mock_account.user_id = mock_user.id
+        mock_account.platform = "reddit"
+        mock_account.refresh_token = "test_refresh_token"
+
+        mock_db = MagicMock()
+        mock_settings = MagicMock()
+
+        with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
+            mock_tm = MagicMock()
+            mock_tm.get_account = AsyncMock(return_value=mock_account)
+            mock_tm.refresh_reddit_token = AsyncMock(return_value=True)
+            MockTokenManager.return_value = mock_tm
+
+            result = await refresh_token_endpoint(
+                request=RefreshTokenRequest(account_id=str(mock_account.id)),
+                current_user=mock_user,
+                db=mock_db,
+                settings=mock_settings,
+            )
+
+            assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_fails_wrong_platform(self):
+        """非 Reddit 帳戶應返回錯誤"""
+        from app.routers.oauth_reddit import refresh_token_endpoint, RefreshTokenRequest
+        from fastapi import HTTPException
+
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+
+        mock_account = MagicMock()
+        mock_account.id = uuid4()
+        mock_account.user_id = mock_user.id
+        mock_account.platform = "google"
+
+        mock_db = MagicMock()
+        mock_settings = MagicMock()
+
+        with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
+            mock_tm = MagicMock()
+            mock_tm.get_account = AsyncMock(return_value=mock_account)
+            MockTokenManager.return_value = mock_tm
+
+            with pytest.raises(HTTPException) as exc_info:
+                await refresh_token_endpoint(
+                    request=RefreshTokenRequest(account_id=str(mock_account.id)),
+                    current_user=mock_user,
+                    db=mock_db,
+                    settings=mock_settings,
+                )
+
+            assert exc_info.value.status_code == 400
+            assert "Reddit" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_fails_wrong_user(self):
+        """非帳戶擁有者應返回 403"""
+        from app.routers.oauth_reddit import refresh_token_endpoint, RefreshTokenRequest
+        from fastapi import HTTPException
+
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+
+        mock_account = MagicMock()
+        mock_account.id = uuid4()
+        mock_account.user_id = uuid4()  # 不同的用戶
+        mock_account.platform = "reddit"
+
+        mock_db = MagicMock()
+        mock_settings = MagicMock()
+
+        with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
+            mock_tm = MagicMock()
+            mock_tm.get_account = AsyncMock(return_value=mock_account)
+            MockTokenManager.return_value = mock_tm
+
+            with pytest.raises(HTTPException) as exc_info:
+                await refresh_token_endpoint(
+                    request=RefreshTokenRequest(account_id=str(mock_account.id)),
+                    current_user=mock_user,
+                    db=mock_db,
+                    settings=mock_settings,
+                )
+
+            assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_account_not_found(self):
+        """帳戶不存在應返回 404"""
+        from app.routers.oauth_reddit import refresh_token_endpoint, RefreshTokenRequest
+        from fastapi import HTTPException
+
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+
+        mock_db = MagicMock()
+        mock_settings = MagicMock()
+
+        with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
+            mock_tm = MagicMock()
+            mock_tm.get_account = AsyncMock(return_value=None)
+            MockTokenManager.return_value = mock_tm
+
+            with pytest.raises(HTTPException) as exc_info:
+                await refresh_token_endpoint(
+                    request=RefreshTokenRequest(account_id=str(uuid4())),
+                    current_user=mock_user,
+                    db=mock_db,
+                    settings=mock_settings,
+                )
+
+            assert exc_info.value.status_code == 404

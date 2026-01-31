@@ -211,6 +211,71 @@ class TokenManager:
             logger.error(f"Failed to refresh TikTok token: {e}")
             return False
 
+    async def refresh_reddit_token(self, account: AdAccount) -> bool:
+        """
+        刷新 Reddit OAuth Token
+
+        Reddit 使用 Basic Auth + refresh_token 刷新
+
+        Args:
+            account: 廣告帳戶
+
+        Returns:
+            是否成功刷新
+        """
+        import os
+
+        if not account.refresh_token:
+            logger.warning(f"Account {account.id} has no refresh token")
+            return False
+
+        # Mock 模式
+        if os.getenv("USE_MOCK_ADS_API", "true").lower() == "true":
+            new_access_token = f"mock_reddit_refreshed_{account.id.hex[:8]}"
+            return await self.update_tokens(
+                account_id=account.id,
+                access_token=new_access_token,
+                expires_in=3600,
+            )
+
+        # 真實 API 呼叫
+        import base64
+
+        credentials = base64.b64encode(
+            f"{settings.REDDIT_CLIENT_ID}:{settings.REDDIT_CLIENT_SECRET}".encode()
+        ).decode()
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://www.reddit.com/api/v1/access_token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": account.refresh_token,
+                },
+                headers={
+                    "Authorization": f"Basic {credentials}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "AdOptimize/1.0",
+                },
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Reddit token refresh failed: {response.text}")
+                return False
+
+            data = response.json()
+
+            if "error" in data:
+                logger.error(f"Reddit token refresh error: {data}")
+                return False
+
+            return await self.update_tokens(
+                account_id=account.id,
+                access_token=data.get("access_token"),
+                refresh_token=data.get("refresh_token"),
+                expires_in=data.get("expires_in", 3600),
+            )
+
     async def refresh_meta_token(self, account: AdAccount) -> bool:
         """
         延長 Meta OAuth Token 有效期
