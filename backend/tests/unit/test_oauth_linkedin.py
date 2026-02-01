@@ -81,3 +81,61 @@ class TestLinkedInAuthUrl:
 
         assert exc_info.value.status_code == 500
         assert "not configured" in exc_info.value.detail
+
+
+class TestLinkedInCallback:
+    """測試 LinkedIn OAuth 回調"""
+
+    @pytest.fixture
+    def mock_settings(self):
+        """模擬設定"""
+        settings = MagicMock()
+        settings.LINKEDIN_CLIENT_ID = "test_client_id"
+        settings.LINKEDIN_CLIENT_SECRET = "test_client_secret"
+        return settings
+
+    @pytest.mark.asyncio
+    async def test_callback_success_mock_mode(self, mock_settings):
+        """Mock 模式下回調應該成功"""
+        from app.routers.oauth_linkedin import exchange_code_for_tokens
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await exchange_code_for_tokens(
+                code="test_code",
+                redirect_uri="http://localhost:3000/callback",
+                settings=mock_settings,
+            )
+
+            assert "access_token" in tokens
+            assert "refresh_token" in tokens
+            assert tokens["expires_in"] == 5184000  # 60 天
+
+    @pytest.mark.asyncio
+    async def test_callback_extracts_tokens(self, mock_settings):
+        """應該正確提取 tokens"""
+        from app.routers.oauth_linkedin import exchange_code_for_tokens
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await exchange_code_for_tokens(
+                code="auth_code_123",
+                redirect_uri="http://localhost:3000/callback",
+                settings=mock_settings,
+            )
+
+            assert tokens["access_token"].startswith("mock_linkedin_access_")
+            assert tokens["refresh_token"].startswith("mock_linkedin_refresh_")
+
+    @pytest.mark.asyncio
+    async def test_callback_returns_scope(self, mock_settings):
+        """應該回傳 scope 資訊"""
+        from app.routers.oauth_linkedin import exchange_code_for_tokens
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await exchange_code_for_tokens(
+                code="auth_code_123",
+                redirect_uri="http://localhost:3000/callback",
+                settings=mock_settings,
+            )
+
+            assert "scope" in tokens
+            assert "r_ads" in tokens["scope"]
