@@ -33,6 +33,7 @@ from app.routers import (
     history,
     notifications,
     oauth_google,
+    oauth_line,
     oauth_meta,
     oauth_reddit,
     oauth_tiktok,
@@ -164,4 +165,10 @@ api_router.include_router(
     oauth_reddit.router,
     prefix="/accounts/connect/reddit",
     tags=["OAuth - Reddit"],
+)
+
+api_router.include_router(
+    oauth_line.router,
+    prefix="/accounts/connect/line",
+    tags=["OAuth - LINE"],
 )
