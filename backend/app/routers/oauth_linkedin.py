@@ -57,6 +57,17 @@ class CallbackResponse(BaseModel):
     error: Optional[str] = None
 
 
+class RefreshTokenRequest(BaseModel):
+    """刷新 Token 請求"""
+    account_id: str
+
+
+class RefreshTokenResponse(BaseModel):
+    """刷新 Token 回應"""
+    success: bool
+    error: Optional[str] = None
+
+
 def is_mock_mode() -> bool:
     """檢查是否在 Mock 模式下運行"""
     return os.getenv("USE_MOCK_ADS_API", "true").lower() == "true"
@@ -223,3 +234,120 @@ async def oauth_callback(
     except Exception as e:
         logger.error(f"LinkedIn OAuth callback error: {e}")
         return CallbackResponse(success=False, error=str(e))
+
+
+async def refresh_access_token(
+    refresh_token: str,
+    settings: Settings,
+) -> dict:
+    """
+    使用 refresh token 取得新的 access token
+
+    Args:
+        refresh_token: LinkedIn OAuth refresh token
+        settings: 應用程式設定
+
+    Returns:
+        包含新 token 資訊的字典
+    """
+    # Mock 模式
+    if is_mock_mode():
+        return {
+            "access_token": f"mock_linkedin_refreshed_{refresh_token[:8]}",
+            "refresh_token": f"mock_linkedin_new_refresh_{refresh_token[:8]}",
+            "expires_in": 5184000,  # 60 天
+            "scope": " ".join(LINKEDIN_SCOPES),
+        }
+
+    # 真實 API 呼叫
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            LINKEDIN_TOKEN_URL,
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": settings.LINKEDIN_CLIENT_ID,
+                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        )
+
+        if response.status_code != 200:
+            logger.error(f"LinkedIn token refresh failed: {response.text}")
+            raise HTTPException(
+                status_code=400,
+                detail="Token refresh failed",
+            )
+
+        data = response.json()
+        return {
+            "access_token": data.get("access_token"),
+            "refresh_token": data.get("refresh_token", refresh_token),
+            "expires_in": data.get("expires_in", 5184000),
+            "scope": data.get("scope", ""),
+        }
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh_token_endpoint(
+    request: RefreshTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RefreshTokenResponse:
+    """
+    刷新 LinkedIn access token
+
+    LinkedIn token 有效期 60 天，此端點可用於提前刷新 token。
+    """
+    try:
+        from uuid import UUID
+
+        token_manager = TokenManager(db)
+
+        # 取得帳戶
+        account = await token_manager.get_account(UUID(request.account_id))
+
+        if not account:
+            return RefreshTokenResponse(
+                success=False,
+                error="Account not found",
+            )
+
+        # 驗證帳戶屬於當前用戶
+        if account.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to refresh this account's token",
+            )
+
+        # 驗證是 LinkedIn 帳戶
+        if account.platform != "linkedin":
+            return RefreshTokenResponse(
+                success=False,
+                error="Account is not a LinkedIn account",
+            )
+
+        # 刷新 token
+        tokens = await refresh_access_token(
+            refresh_token=account.refresh_token,
+            settings=settings,
+        )
+
+        # 更新帳戶 tokens
+        await token_manager.update_tokens(
+            account_id=UUID(request.account_id),
+            access_token=tokens["access_token"],
+            refresh_token=tokens["refresh_token"],
+            expires_in=tokens["expires_in"],
+        )
+
+        return RefreshTokenResponse(success=True)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LinkedIn token refresh error: {e}")
+        return RefreshTokenResponse(success=False, error=str(e))

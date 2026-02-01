@@ -139,3 +139,70 @@ class TestLinkedInCallback:
 
             assert "scope" in tokens
             assert "r_ads" in tokens["scope"]
+
+
+class TestLinkedInRefreshToken:
+    """測試 LinkedIn Token 刷新"""
+
+    @pytest.fixture
+    def mock_settings(self):
+        from unittest.mock import MagicMock
+        settings = MagicMock()
+        settings.LINKEDIN_CLIENT_ID = "test_client_id"
+        settings.LINKEDIN_CLIENT_SECRET = "test_client_secret"
+        return settings
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_mock_mode(self, mock_settings):
+        """Mock 模式下應該成功刷新 token"""
+        from app.routers.oauth_linkedin import refresh_access_token
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await refresh_access_token(
+                refresh_token="old_refresh_token",
+                settings=mock_settings,
+            )
+
+            assert "access_token" in tokens
+            assert tokens["expires_in"] == 5184000  # 60 天
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_returns_new_token(self, mock_settings):
+        """刷新後應該回傳新的 access token"""
+        from app.routers.oauth_linkedin import refresh_access_token
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await refresh_access_token(
+                refresh_token="test_refresh",
+                settings=mock_settings,
+            )
+
+            assert tokens["access_token"].startswith("mock_linkedin_refreshed_")
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_returns_new_refresh_token(self, mock_settings):
+        """刷新後應該回傳新的 refresh token"""
+        from app.routers.oauth_linkedin import refresh_access_token
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await refresh_access_token(
+                refresh_token="test_refresh",
+                settings=mock_settings,
+            )
+
+            assert "refresh_token" in tokens
+            assert tokens["refresh_token"].startswith("mock_linkedin_new_refresh_")
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_returns_scope(self, mock_settings):
+        """刷新後應該回傳 scope 資訊"""
+        from app.routers.oauth_linkedin import refresh_access_token
+
+        with patch("app.routers.oauth_linkedin.is_mock_mode", return_value=True):
+            tokens = await refresh_access_token(
+                refresh_token="test_refresh",
+                settings=mock_settings,
+            )
+
+            assert "scope" in tokens
+            assert "r_ads" in tokens["scope"]
