@@ -26,7 +26,7 @@ type AccountStatus = 'connected' | 'expired' | 'error';
  */
 interface AdAccount {
   id: string;
-  platform: 'google' | 'meta' | 'tiktok' | 'reddit' | 'line';
+  platform: 'google' | 'meta' | 'tiktok' | 'reddit' | 'line' | 'linkedin';
   name: string;
   accountId: string;
   status: AccountStatus;
@@ -74,6 +74,12 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
       text: 'text-white dark:text-gray-100',
       label: 'LINE Ads',
       icon: 'L',
+    },
+    linkedin: {
+      bg: 'bg-blue-700 dark:bg-blue-800',
+      text: 'text-white dark:text-gray-100',
+      label: 'LinkedIn Ads',
+      icon: 'in',
     },
   };
 
@@ -220,7 +226,7 @@ function AccountsContent() {
             last_synced_at: string;
           }) => ({
             id: acc.id,
-            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit' | 'line',
+            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit' | 'line' | 'linkedin',
             name: acc.name,
             accountId: acc.external_id,
             status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
@@ -250,6 +256,7 @@ function AccountsContent() {
         tiktok: 'TikTok Ads',
         reddit: 'Reddit Ads',
         line: 'LINE Ads',
+        linkedin: 'LinkedIn Ads',
       };
       const platform = platformNames[success] || success;
       setToast({
@@ -397,6 +404,37 @@ function AccountsContent() {
   };
 
   /**
+   * 連結 LinkedIn 帳戶
+   */
+  const handleConnectLinkedIn = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/linkedin', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
+      } else {
+        const error = await response.json();
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
+      }
+    } catch (error) {
+      console.error('Connect LinkedIn error:', error);
+      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+    }
+  };
+
+  /**
    * 連結 LINE 帳戶（需要表單輸入）
    */
   const handleConnectLine = async () => {
@@ -522,7 +560,7 @@ function AccountsContent() {
             <div>
               <CardTitle className="text-lg">連結新帳戶</CardTitle>
               <CardDescription>
-                連結您的 Google Ads、Meta、TikTok 或 Reddit 廣告帳戶以開始優化
+                連結您的 Google Ads、Meta、TikTok、Reddit 或 LinkedIn 廣告帳戶以開始優化
               </CardDescription>
             </div>
           </div>
@@ -560,6 +598,14 @@ function AccountsContent() {
             >
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 LINE Ads
+            </Button>
+            <Button
+              onClick={handleConnectLinkedIn}
+              variant="outline"
+              className="flex-1 min-w-[150px] bg-blue-700 text-white hover:bg-blue-800 border-blue-700"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              連結 LinkedIn Ads
             </Button>
           </div>
 
