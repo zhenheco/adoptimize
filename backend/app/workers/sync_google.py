@@ -20,7 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.db.base import async_session_factory
+from app.db.base import create_worker_session_maker
 from app.models.ad_account import AdAccount
 from app.models.campaign import Campaign
 from app.models.ad_set import AdSet
@@ -36,7 +36,8 @@ settings = get_settings()
 
 async def _get_google_accounts() -> list[AdAccount]:
     """取得所有活躍的 Google Ads 帳戶"""
-    async with async_session_factory() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(
                 AdAccount.platform == "google",
@@ -88,7 +89,8 @@ async def _sync_google_account(account_id: str) -> dict:
     Returns:
         同步結果
     """
-    async with async_session_factory() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         # 1. 取得帳戶資訊
         result = await session.execute(
             select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))

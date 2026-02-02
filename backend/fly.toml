@@ -6,14 +6,21 @@ primary_region = 'sin'  # 新加坡，離台灣近
 
 [build]
 
+# 定義多個進程
+[processes]
+  app = "uvicorn app.main:app --host 0.0.0.0 --port 8080"
+  worker = "celery -A app.workers.celery_app worker -B --loglevel=info"
+
+# HTTP 服務配置（僅適用於 app 進程）
 [http_service]
   internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1  # 保持至少 1 台 API 機器運行
   processes = ['app']
 
+# 健康檢查（僅適用於 app 進程）
 [checks]
   [checks.health]
     grace_period = "30s"
@@ -23,7 +30,9 @@ primary_region = 'sin'  # 新加坡，離台灣近
     port = 8080
     timeout = "5s"
     type = "http"
+    processes = ['app']
 
+# VM 配置
 [[vm]]
   memory = '512mb'
   cpu_kind = 'shared'

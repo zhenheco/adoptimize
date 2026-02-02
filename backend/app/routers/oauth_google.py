@@ -248,15 +248,23 @@ async def oauth_callback(
 
         # 使用 TokenManager 儲存帳戶到資料庫
         token_manager = TokenManager(db)
-        account_id = await token_manager.save_new_account(
+        external_id = customer_ids[0] if customer_ids else "pending"
+
+        account_id, is_new, error = await token_manager.save_or_update_account(
             user_id=user_id,
             platform="google",
-            external_id=customer_ids[0] if customer_ids else "pending",
+            external_id=external_id,
             name="Google Ads Account",
             access_token=access_token,
             refresh_token=refresh_token or "",
             expires_in=expires_in,
         )
+
+        if error:
+            return CallbackResponse(
+                success=False,
+                error=error,
+            )
 
         # 觸發健檢任務（背景執行）
         audit_task_id = None

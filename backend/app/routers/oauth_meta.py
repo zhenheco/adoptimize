@@ -290,10 +290,12 @@ async def oauth_callback(
         # 使用 TokenManager 儲存每個廣告帳戶到資料庫
         token_manager = TokenManager(db)
         saved_account_ids = []
+        updated_account_ids = []
         audit_task_ids = []
+        errors = []
 
         for account in ad_accounts:
-            account_id = await token_manager.save_new_account(
+            account_id, is_new, error = await token_manager.save_or_update_account(
                 user_id=user_id,
                 platform="meta",
                 external_id=account.get("id", "unknown"),
@@ -302,7 +304,16 @@ async def oauth_callback(
                 refresh_token="",  # Meta 不使用 refresh token
                 expires_in=expires_in,
             )
-            saved_account_ids.append(str(account_id))
+
+            if error:
+                # 帳戶屬於其他用戶
+                errors.append(f"{account.get('name', account.get('id'))}: {error}")
+                continue
+
+            if is_new:
+                saved_account_ids.append(str(account_id))
+            else:
+                updated_account_ids.append(str(account_id))
 
             # 觸發健檢任務（背景執行）
             if run_health_audit is not None:
@@ -313,9 +324,20 @@ async def oauth_callback(
                     # Celery 可能未啟動，記錄但不中斷流程
                     logger.warning(f"Failed to trigger health audit for account {account_id}: {e}")
 
+        # 判斷回應
+        all_account_ids = saved_account_ids + updated_account_ids
+
+        if not all_account_ids and errors:
+            # 所有帳戶都失敗
+            return CallbackResponse(
+                success=False,
+                error="; ".join(errors),
+            )
+
+        # 部分或全部成功
         return CallbackResponse(
             success=True,
-            account_id=saved_account_ids[0] if saved_account_ids else None,
+            account_id=all_account_ids[0] if all_account_ids else None,
             ad_accounts=ad_accounts,
             audit_task_ids=audit_task_ids if audit_task_ids else None,
         )

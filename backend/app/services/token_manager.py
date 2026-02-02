@@ -369,7 +369,28 @@ class TokenManager:
             await self.db.rollback()
             return False
 
-    async def save_new_account(
+    async def get_account_by_external_id(
+        self, platform: str, external_id: str
+    ) -> Optional[AdAccount]:
+        """
+        根據平台和外部 ID 取得帳戶
+
+        Args:
+            platform: 平台名稱
+            external_id: 平台帳戶 ID
+
+        Returns:
+            AdAccount 或 None
+        """
+        result = await self.db.execute(
+            select(AdAccount).where(
+                AdAccount.platform == platform,
+                AdAccount.external_id == external_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def save_or_update_account(
         self,
         user_id: uuid.UUID,
         platform: str,
@@ -378,9 +399,9 @@ class TokenManager:
         access_token: str,
         refresh_token: Optional[str],
         expires_in: int,
-    ) -> uuid.UUID:
+    ) -> tuple[uuid.UUID, bool, Optional[str]]:
         """
-        儲存新的廣告帳戶
+        儲存或更新廣告帳戶（處理重複連接）
 
         Args:
             user_id: 用戶 ID
@@ -392,10 +413,46 @@ class TokenManager:
             expires_in: Token 有效秒數
 
         Returns:
-            新建立的帳戶 ID
+            tuple[account_id, is_new, error]:
+            - account_id: 帳戶 ID
+            - is_new: 是否為新建立的帳戶
+            - error: 錯誤訊息（如果有）
         """
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
+        # 檢查帳戶是否已存在
+        existing = await self.get_account_by_external_id(platform, external_id)
+
+        if existing:
+            # 帳戶已存在，檢查是否屬於同一用戶
+            if existing.user_id != user_id:
+                # 帳戶屬於其他用戶
+                logger.warning(
+                    f"Account {external_id} already connected to another user"
+                )
+                return (
+                    existing.id,
+                    False,
+                    "此廣告帳戶已被其他用戶連接，請確認帳號或聯繫支援",
+                )
+
+            # 同一用戶重新連接，更新 token
+            logger.info(f"Updating existing account {external_id} for user {user_id}")
+            await self.db.execute(
+                update(AdAccount)
+                .where(AdAccount.id == existing.id)
+                .values(
+                    name=name,
+                    access_token=access_token,
+                    refresh_token=refresh_token or existing.refresh_token or "",
+                    token_expires_at=expires_at,
+                    status="active",
+                )
+            )
+            await self.db.commit()
+            return (existing.id, False, None)
+
+        # 新帳戶，建立記錄
         account = AdAccount(
             user_id=user_id,
             platform=platform,
@@ -411,7 +468,48 @@ class TokenManager:
         await self.db.commit()
         await self.db.refresh(account)
 
-        return account.id
+        logger.info(f"Created new account {external_id} for user {user_id}")
+        return (account.id, True, None)
+
+    async def save_new_account(
+        self,
+        user_id: uuid.UUID,
+        platform: str,
+        external_id: str,
+        name: str,
+        access_token: str,
+        refresh_token: Optional[str],
+        expires_in: int,
+    ) -> uuid.UUID:
+        """
+        儲存新的廣告帳戶（保留舊 API 相容性）
+
+        注意：建議使用 save_or_update_account 來正確處理重複連接
+
+        Args:
+            user_id: 用戶 ID
+            platform: 平台名稱 (google, meta)
+            external_id: 平台帳戶 ID
+            name: 帳戶名稱
+            access_token: OAuth access token
+            refresh_token: OAuth refresh token
+            expires_in: Token 有效秒數
+
+        Returns:
+            新建立的帳戶 ID
+        """
+        account_id, _, error = await self.save_or_update_account(
+            user_id=user_id,
+            platform=platform,
+            external_id=external_id,
+            name=name,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=expires_in,
+        )
+        if error:
+            raise ValueError(error)
+        return account_id
 
     async def is_token_valid(self, account_id: uuid.UUID) -> bool:
         """

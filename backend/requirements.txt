@@ -7,10 +7,13 @@ sqlalchemy>=2.0.25,<3.0.0
 asyncpg>=0.29.0,<1.0.0
 alembic>=1.13.0,<2.0.0
 
-# Redis (for caching)
+# Redis (for caching and Celery broker)
 redis>=5.0.0,<6.0.0
 
-# Scheduler
+# Celery (background tasks)
+celery[redis]>=5.3.0,<6.0.0
+
+# Scheduler (legacy, may be removed)
 APScheduler>=3.10.0,<4.0.0
 
 # Pydantic for settings and validation
