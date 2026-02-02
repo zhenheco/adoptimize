@@ -12,6 +12,7 @@ from app.models.audience import Audience
 from app.models.audience_metrics import AudienceMetrics
 from app.models.audience_suggestion import AudienceSuggestion
 from app.models.audit_issue import AuditIssue
+from app.models.billable_action import BillableAction
 from app.models.campaign import Campaign
 from app.models.creative import Creative
 from app.models.creative_metrics import CreativeMetrics
@@ -21,7 +22,9 @@ from app.models.interest_tag import InterestTag
 from app.models.notification import Notification
 from app.models.recommendation import Recommendation
 from app.models.report import Report
+from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.wallet import Wallet, WalletTransaction
 
 __all__ = [
     "User",
@@ -43,4 +46,9 @@ __all__ = [
     "IndustryBenchmark",
     "InterestTag",
     "Report",
+    # 計費相關
+    "Wallet",
+    "WalletTransaction",
+    "Subscription",
+    "BillableAction",
 ]

@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Ship,
+  Wallet,
 } from 'lucide-react';
 import { RestartTourButton } from '@/components/onboarding';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { href: '/ai-studio', label: 'AI 創作', icon: Sparkles },
   { href: '/reports', label: '報告', icon: FileText },
   { href: '/accounts', label: '帳號連接', icon: Link2 },
+  { href: '/billing', label: '帳單', icon: Wallet },
 ];
 
 /**

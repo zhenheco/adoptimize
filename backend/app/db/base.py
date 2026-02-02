@@ -81,6 +81,33 @@ class DatabaseUnavailableError(Exception):
     pass
 
 
+def create_worker_session_maker():
+    """
+    為 Celery Worker 創建新的 session maker
+
+    Celery Worker 使用 asyncio.run() 創建新的 event loop，
+    所以需要在每次調用時創建新的 engine 和 session maker。
+    """
+    worker_engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,
+        pool_pre_ping=True,
+        pool_size=2,
+        max_overflow=3,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
+    )
+    return async_sessionmaker(
+        bind=worker_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+
 async def get_db() -> AsyncSession:
     """
     依賴注入：取得資料庫 Session

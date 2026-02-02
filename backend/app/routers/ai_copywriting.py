@@ -9,10 +9,14 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.base import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.services.ai_copywriting_service import AICopywritingService
+from app.services.billing_service import BillingService
+from app.services.wallet_service import WalletService
 
 router = APIRouter()
 
@@ -53,6 +57,7 @@ class AllPlatformResponse(BaseModel):
 @router.post("/copywriting")
 async def generate_copywriting(
     request: CopywritingRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """
@@ -61,6 +66,10 @@ async def generate_copywriting(
     - **platform=google**: 生成 Google Ads RSA 文案（10 個標題 + 4 個描述）
     - **platform=meta**: 生成 Meta Ads 文案（3 個 Primary Text + 5 個標題 + 3 個描述）
     - **platform=all**: 同時生成兩個平台的文案
+
+    計費規則：
+    - 有配額時消耗配額，不收費
+    - 配額用完後按方案收費（Free: NT$5/次，Pro: NT$5/次超額，Agency: NT$3/次超額）
     """
     if not request.product_description.strip():
         raise HTTPException(
@@ -68,13 +77,28 @@ async def generate_copywriting(
             detail="請提供商品描述",
         )
 
-    # TODO: 檢查用戶用量限制
-    # if current_user.ai_copywriting_count >= 20:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-    #         detail="本月文案生成次數已達上限",
-    #     )
+    # 檢查並扣除 AI 文案生成費用（配額或餘額）
+    charged = await BillingService.charge_ai_usage(db, current_user.id, "copywriting")
+    if not charged:
+        # 檢查是配額用完還是餘額不足
+        quota_status = await BillingService.get_ai_quota_status(db, current_user.id)
+        copywriting_remaining = quota_status["copywriting"]["remaining"]
 
+        if copywriting_remaining == 0:
+            # 配額用完，餘額也不足
+            balance = await WalletService.get_balance(db, current_user.id)
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"文案配額已用完，錢包餘額不足。目前餘額: NT${balance}，請儲值後再試。",
+            )
+        else:
+            # 其他錯誤
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="計費系統錯誤，請稍後再試",
+            )
+
+    # 生成文案
     service = AICopywritingService()
     result = await service.generate_copy(
         product_description=request.product_description,
@@ -82,8 +106,8 @@ async def generate_copywriting(
         platform=request.platform,
     )
 
-    # TODO: 更新用戶用量
-    # current_user.ai_copywriting_count += 1
+    # 提交交易
+    await db.commit()
 
     # 根據平台返回不同格式
     if request.platform == "all":

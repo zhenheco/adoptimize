@@ -27,6 +27,7 @@ from app.routers import (
     audits,
     audiences,
     autopilot,
+    billing,
     creatives,
     dashboard,
     health,
@@ -141,6 +142,12 @@ api_router.include_router(
     history.router,
     prefix="/history",
     tags=["History"],
+)
+
+# 計費路由
+api_router.include_router(
+    billing.router,
+    tags=["Billing"],
 )
 
 # OAuth 連接路由

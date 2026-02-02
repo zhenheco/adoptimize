@@ -18,8 +18,11 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.ad_account import AdAccount
     from app.models.audience_suggestion import AudienceSuggestion
+    from app.models.billable_action import BillableAction
     from app.models.notification import Notification
     from app.models.report import Report
+    from app.models.subscription import Subscription
+    from app.models.wallet import Wallet
 
 
 class User(Base):
@@ -131,6 +134,23 @@ class User(Base):
     )
     reports: Mapped[list["Report"]] = relationship(
         "Report",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    wallet: Mapped[Optional["Wallet"]] = relationship(
+        "Wallet",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    subscription: Mapped[Optional["Subscription"]] = relationship(
+        "Subscription",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    billable_actions: Mapped[list["BillableAction"]] = relationship(
+        "BillableAction",
         back_populates="user",
         cascade="all, delete-orphan",
     )

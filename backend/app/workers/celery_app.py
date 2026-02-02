@@ -14,15 +14,34 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+
+def _get_redis_url_with_ssl(url: str) -> str:
+    """
+    為 rediss:// URL 添加 SSL 參數
+
+    Upstash Redis 使用 TLS，Celery 需要明確指定 ssl_cert_reqs 參數
+    """
+    if url.startswith("rediss://"):
+        # 如果 URL 已經有參數，使用 & 分隔；否則使用 ?
+        separator = "&" if "?" in url else "?"
+        return f"{url}{separator}ssl_cert_reqs=CERT_NONE"
+    return url
+
+
+# 處理 Redis URL 的 SSL 設定
+broker_url = _get_redis_url_with_ssl(settings.celery_broker)
+backend_url = _get_redis_url_with_ssl(settings.celery_backend)
+
 # 建立 Celery 應用程式
 celery_app = Celery(
     "adoptimize",
-    broker=settings.celery_broker,
-    backend=settings.celery_backend,
+    broker=broker_url,
+    backend=backend_url,
     include=[
         "app.workers.sync_google",
         "app.workers.sync_meta",
         "app.workers.run_health_audit",
+        "app.workers.billing_tasks",
     ],
 )
 
@@ -48,15 +67,24 @@ celery_app.conf.update(
 
 # 排程任務（Celery Beat）
 # 每 15 分鐘同步一次 Google 和 Meta 廣告數據
+from celery.schedules import crontab
+
 celery_app.conf.beat_schedule = {
     "sync-google-ads-every-15-minutes": {
         "task": "app.workers.sync_google.sync_all_accounts",
         "schedule": 15 * 60,  # 每 15 分鐘
-        "options": {"queue": "sync"},
     },
     "sync-meta-ads-every-15-minutes": {
         "task": "app.workers.sync_meta.sync_all_accounts",
         "schedule": 15 * 60,  # 每 15 分鐘
-        "options": {"queue": "sync"},
+    },
+    # 計費相關任務
+    "charge-monthly-fees": {
+        "task": "app.workers.billing_tasks.charge_monthly_fees",
+        "schedule": crontab(day_of_month="1", hour="0", minute="30"),  # 每月 1 日 00:30
+    },
+    "reset-monthly-quotas": {
+        "task": "app.workers.billing_tasks.reset_monthly_quotas",
+        "schedule": crontab(day_of_month="1", hour="0", minute="0"),  # 每月 1 日 00:00
     },
 }
