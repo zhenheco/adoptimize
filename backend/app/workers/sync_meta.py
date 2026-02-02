@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import SyncError, TokenExpiredError, RateLimitError
-from app.db.base import async_session_maker
+from app.db.base import create_worker_session_maker
 from app.models.ad_account import AdAccount
 from app.models.campaign import Campaign
 from app.models.ad_set import AdSet
@@ -40,9 +40,31 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _is_valid_token(token: str | None) -> bool:
+    """
+    驗證 access_token 是否有效（非空）
+
+    這是防止高 API 錯誤率的關鍵檢查。
+    Meta App Review 會因為高錯誤率拒絕權限申請，
+    所以必須在呼叫 API 前驗證 token 有效性。
+
+    Args:
+        token: access_token 字串或 None
+
+    Returns:
+        True 如果 token 非空且有效，否則 False
+    """
+    if token is None:
+        return False
+    if not token.strip():
+        return False
+    return True
+
+
 async def _get_meta_accounts() -> list[AdAccount]:
     """取得所有活躍的 Meta Ads 帳戶"""
-    async with async_session_maker() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(
                 AdAccount.platform == "meta",
@@ -94,7 +116,8 @@ async def _sync_meta_account(account_id: str) -> dict:
     Returns:
         同步結果
     """
-    async with async_session_maker() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         # 1. 取得帳戶資訊
         result = await session.execute(
             select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
@@ -207,7 +230,8 @@ def sync_campaigns(account_id: str):
 
 async def _sync_campaigns_task(account_id: str) -> dict[str, Any]:
     """執行 campaigns 同步的異步任務"""
-    async with async_session_maker() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
         )
@@ -289,10 +313,28 @@ async def sync_campaigns_for_account(
 
     AC-M1: 能從 Meta API 取得 campaigns 並存入 DB
     """
+    # 驗證 Token 有效性 - 防止無效 API 呼叫導致高錯誤率
+    if not _is_valid_token(account.access_token):
+        logger.warning(
+            f"Invalid or empty token for account {account.id}, skipping API call"
+        )
+        # 標記帳戶狀態
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_invalid")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "invalid_token",
+            "account_id": str(account.id),
+        }
+
     try:
         # 初始化 Meta API Client
         client = MetaAPIClient(
-            access_token=account.access_token or "",
+            access_token=account.access_token,
             ad_account_id=account.external_id,
         )
 
@@ -420,10 +462,27 @@ async def sync_adsets_for_account(
 
     AC-M2: 能同步 ad sets 並關聯到正確的 campaign
     """
+    # 驗證 Token 有效性 - 防止無效 API 呼叫導致高錯誤率
+    if not _is_valid_token(account.access_token):
+        logger.warning(
+            f"Invalid or empty token for account {account.id}, skipping API call"
+        )
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_invalid")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "invalid_token",
+            "account_id": str(account.id),
+        }
+
     try:
         # 初始化 Meta API Client
         client = MetaAPIClient(
-            access_token=account.access_token or "",
+            access_token=account.access_token,
             ad_account_id=account.external_id,
         )
 
@@ -561,9 +620,26 @@ async def sync_ads_for_account(
 
     AC-M3: 能同步 ads 並關聯到正確的 ad set
     """
+    # 驗證 Token 有效性 - 防止無效 API 呼叫導致高錯誤率
+    if not _is_valid_token(account.access_token):
+        logger.warning(
+            f"Invalid or empty token for account {account.id}, skipping API call"
+        )
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_invalid")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "invalid_token",
+            "account_id": str(account.id),
+        }
+
     try:
         client = MetaAPIClient(
-            access_token=account.access_token or "",
+            access_token=account.access_token,
             ad_account_id=account.external_id,
         )
 
@@ -736,9 +812,26 @@ async def sync_metrics_for_account(
 
     AC-M4: 能取得 insights 並計算 CTR、CPC、ROAS
     """
+    # 驗證 Token 有效性 - 防止無效 API 呼叫導致高錯誤率
+    if not _is_valid_token(account.access_token):
+        logger.warning(
+            f"Invalid or empty token for account {account.id}, skipping API call"
+        )
+        await session.execute(
+            update(AdAccount)
+            .where(AdAccount.id == account.id)
+            .values(status="token_invalid")
+        )
+        await session.commit()
+        return {
+            "status": "error",
+            "error": "invalid_token",
+            "account_id": str(account.id),
+        }
+
     try:
         client = MetaAPIClient(
-            access_token=account.access_token or "",
+            access_token=account.access_token,
             ad_account_id=account.external_id,
         )
 
@@ -877,7 +970,8 @@ def sync_metrics(account_id: str, date_range: str = "last_7d"):
 
 async def _sync_metrics_task(account_id: str, date_range: str) -> dict[str, Any]:
     """執行 metrics 同步的異步任務"""
-    async with async_session_maker() as session:
+    worker_session_maker = create_worker_session_maker()
+    async with worker_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
         )

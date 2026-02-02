@@ -252,3 +252,43 @@ class TestParseAdSetData:
         result = _parse_adset_data(raw_data)
 
         assert result["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
+
+
+class TestSyncAdSetsTokenValidation:
+    """測試 Token 驗證 - 防止無效 API 呼叫造成高錯誤率"""
+
+    @pytest_asyncio.fixture
+    async def account_with_empty_token(self, db_session: AsyncSession):
+        """建立 Token 為空的測試帳戶"""
+        account = AdAccount(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            platform="meta",
+            external_id="123456789",
+            name="Empty Token Account",
+            status="active",
+            access_token="",
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+        return account
+
+    @pytest.mark.asyncio
+    async def test_sync_adsets_skips_empty_token(
+        self, db_session: AsyncSession, account_with_empty_token: AdAccount
+    ):
+        """當 access_token 為空時，應跳過 API 呼叫"""
+        with patch("app.workers.sync_meta.MetaAPIClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+
+            result = await sync_adsets_for_account(
+                session=db_session,
+                account=account_with_empty_token,
+            )
+
+            assert result["status"] == "error"
+            assert result["error"] == "invalid_token"
+            mock_client.get_adsets.assert_not_called()

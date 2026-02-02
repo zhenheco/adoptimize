@@ -247,3 +247,113 @@ class TestParseCampaignData:
         assert result["name"] == "Minimal Campaign"
         assert result["budget_type"] is None
         assert result["budget_amount"] is None
+
+
+class TestSyncCampaignsTokenValidation:
+    """測試 Token 驗證 - 防止無效 API 呼叫造成高錯誤率"""
+
+    @pytest_asyncio.fixture
+    async def account_with_empty_token(self, db_session: AsyncSession):
+        """建立 Token 為空的測試帳戶"""
+        account = AdAccount(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            platform="meta",
+            external_id="123456789",
+            name="Empty Token Account",
+            status="active",
+            access_token="",  # 空 Token
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+        return account
+
+    @pytest_asyncio.fixture
+    async def account_with_none_token(self, db_session: AsyncSession):
+        """建立 Token 為 None 的測試帳戶"""
+        account = AdAccount(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            platform="meta",
+            external_id="987654321",
+            name="None Token Account",
+            status="active",
+            access_token=None,  # None Token
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+        return account
+
+    @pytest.mark.asyncio
+    async def test_sync_campaigns_skips_empty_token(
+        self, db_session: AsyncSession, account_with_empty_token: AdAccount
+    ):
+        """
+        當 access_token 為空字串時，應直接返回 invalid_token 錯誤，不呼叫 API
+
+        這是防止 Meta App Review 被拒絕的關鍵測試：
+        - 不應該發送無效的 API 請求
+        - 應該返回明確的錯誤狀態
+        """
+        with patch("app.workers.sync_meta.MetaAPIClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+
+            result = await sync_campaigns_for_account(
+                session=db_session,
+                account=account_with_empty_token,
+            )
+
+            # 驗證返回錯誤狀態
+            assert result["status"] == "error"
+            assert result["error"] == "invalid_token"
+
+            # 關鍵：驗證 API 沒有被呼叫
+            mock_client.get_campaigns.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_campaigns_skips_none_token(
+        self, db_session: AsyncSession, account_with_none_token: AdAccount
+    ):
+        """
+        當 access_token 為 None 時，應直接返回 invalid_token 錯誤，不呼叫 API
+        """
+        with patch("app.workers.sync_meta.MetaAPIClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+
+            result = await sync_campaigns_for_account(
+                session=db_session,
+                account=account_with_none_token,
+            )
+
+            # 驗證返回錯誤狀態
+            assert result["status"] == "error"
+            assert result["error"] == "invalid_token"
+
+            # 關鍵：驗證 API 沒有被呼叫
+            mock_client.get_campaigns.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sync_campaigns_marks_account_status_when_invalid_token(
+        self, db_session: AsyncSession, account_with_empty_token: AdAccount
+    ):
+        """
+        當偵測到無效 Token 時，應將帳戶狀態標記為 token_invalid
+        """
+        with patch("app.workers.sync_meta.MetaAPIClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+
+            await sync_campaigns_for_account(
+                session=db_session,
+                account=account_with_empty_token,
+            )
+
+            # 重新查詢帳戶狀態
+            await db_session.refresh(account_with_empty_token)
+            assert account_with_empty_token.status == "token_invalid"
