@@ -8,3 +8,5 @@ export { SubscriptionCard } from './subscription-card';
 export { PricingTable } from './pricing-table';
 export { AIQuotaCard } from './ai-quota-card';
 export { BalanceWarning, BalanceWarningBanner } from './balance-warning';
+export { BalanceWarningProvider } from './balance-warning-provider';
+export { FeeEstimate } from './fee-estimate';
