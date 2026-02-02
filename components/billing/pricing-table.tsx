@@ -64,6 +64,45 @@ const PLAN_META: Record<string, {
 export function PricingTable({ plans, currentPlan, onSelectPlan, isLoading }: PricingTableProps) {
   const planOrder = ['free', 'pro', 'agency'];
 
+  function renderPlanButton(
+    isCurrent: boolean,
+    canUpgrade: boolean,
+    canDowngrade: boolean,
+    planKey: string
+  ): React.ReactNode {
+    if (isCurrent) {
+      return (
+        <Button variant="outline" className="w-full" disabled>
+          目前方案
+        </Button>
+      );
+    }
+
+    if (canUpgrade) {
+      return (
+        <Button
+          className="w-full"
+          onClick={() => onSelectPlan?.(planKey)}
+          disabled={isLoading}
+        >
+          {isLoading ? '處理中...' : '升級到此方案'}
+        </Button>
+      );
+    }
+
+    const buttonText = canDowngrade ? '降級到此方案' : '選擇此方案';
+    return (
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => onSelectPlan?.(planKey)}
+        disabled={isLoading}
+      >
+        {isLoading ? '處理中...' : buttonText}
+      </Button>
+    );
+  }
+
   const formatAmount = (amount: number) => {
     if (amount === 0) return '免費';
     return new Intl.NumberFormat('zh-TW', {
@@ -199,37 +238,7 @@ export function PricingTable({ plans, currentPlan, onSelectPlan, isLoading }: Pr
 
                 {/* 操作按鈕 */}
                 <div className="pt-4">
-                  {isCurrent ? (
-                    <Button variant="outline" className="w-full" disabled>
-                      目前方案
-                    </Button>
-                  ) : canUpgrade ? (
-                    <Button
-                      className="w-full"
-                      onClick={() => onSelectPlan?.(planKey)}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? '處理中...' : '升級到此方案'}
-                    </Button>
-                  ) : canDowngrade ? (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => onSelectPlan?.(planKey)}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? '處理中...' : '降級到此方案'}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => onSelectPlan?.(planKey)}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? '處理中...' : '選擇此方案'}
-                    </Button>
-                  )}
+                  {renderPlanButton(isCurrent, canUpgrade, canDowngrade, planKey)}
                 </div>
               </div>
             </CardContent>

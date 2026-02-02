@@ -18,7 +18,11 @@ from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.services.wallet_service import WalletService
 from app.services.billing_service import BillingService
-from app.services.billing_config import PRICING_PLANS
+from app.services.billing_config import (
+    PRICING_PLANS,
+    calculate_commission,
+    is_billable_action,
+)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -291,9 +295,6 @@ async def estimate_fee(
     """預估操作費用"""
     subscription = await BillingService.get_or_create_subscription(db, current_user.id)
     balance = await WalletService.get_balance(db, current_user.id)
-
-    # 計算抽成
-    from app.services.billing_config import calculate_commission, is_billable_action
 
     if not is_billable_action(request.action_type):
         # 免費操作

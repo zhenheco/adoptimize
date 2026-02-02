@@ -80,6 +80,12 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
   const isUnlimitedCopywriting = subscription.monthly_copywriting_quota === -1;
   const isUnlimitedImage = subscription.monthly_image_quota === -1;
 
+  function getProgressBarColor(percentage: number): string {
+    if (percentage >= 90) return 'bg-red-500';
+    if (percentage >= 70) return 'bg-yellow-500';
+    return 'bg-blue-500';
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -143,13 +149,7 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
               {!isUnlimitedCopywriting && (
                 <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full transition-all ${
-                      copywritingPercentage >= 90
-                        ? 'bg-red-500'
-                        : copywritingPercentage >= 70
-                        ? 'bg-yellow-500'
-                        : 'bg-blue-500'
-                    }`}
+                    className={`h-full transition-all ${getProgressBarColor(copywritingPercentage)}`}
                     style={{ width: `${Math.min(copywritingPercentage, 100)}%` }}
                   />
                 </div>
@@ -170,13 +170,7 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
               {!isUnlimitedImage && subscription.monthly_image_quota > 0 && (
                 <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full transition-all ${
-                      imagePercentage >= 90
-                        ? 'bg-red-500'
-                        : imagePercentage >= 70
-                        ? 'bg-yellow-500'
-                        : 'bg-blue-500'
-                    }`}
+                    className={`h-full transition-all ${getProgressBarColor(imagePercentage)}`}
                     style={{ width: `${Math.min(imagePercentage, 100)}%` }}
                   />
                 </div>
