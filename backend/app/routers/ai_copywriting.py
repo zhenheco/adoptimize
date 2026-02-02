@@ -15,8 +15,7 @@ from app.db.base import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.services.ai_copywriting_service import AICopywritingService
-from app.services.billing_service import BillingService
-from app.services.wallet_service import WalletService
+from app.services.billing_integration import BillingIntegration
 
 router = APIRouter()
 
@@ -77,34 +76,32 @@ async def generate_copywriting(
             detail="請提供商品描述",
         )
 
-    # 檢查並扣除 AI 文案生成費用（配額或餘額）
-    charged = await BillingService.charge_ai_usage(db, current_user.id, "copywriting")
-    if not charged:
-        # 檢查是配額用完還是餘額不足
-        quota_status = await BillingService.get_ai_quota_status(db, current_user.id)
-        copywriting_remaining = quota_status["copywriting"]["remaining"]
+    # 1. 先檢查是否可以使用（配額或餘額）
+    usage_check = await BillingIntegration.can_use_ai_copywriting(db, current_user.id)
+    if not usage_check.can_use:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=usage_check.message,
+        )
 
-        if copywriting_remaining == 0:
-            # 配額用完，餘額也不足
-            balance = await WalletService.get_balance(db, current_user.id)
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"文案配額已用完，錢包餘額不足。目前餘額: NT${balance}，請儲值後再試。",
-            )
-        else:
-            # 其他錯誤
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="計費系統錯誤，請稍後再試",
-            )
-
-    # 生成文案
+    # 2. 生成文案
     service = AICopywritingService()
     result = await service.generate_copy(
         product_description=request.product_description,
         style=request.style,
         platform=request.platform,
     )
+
+    # 3. 成功後扣費（使用配額或從錢包扣款）
+    charged = await BillingIntegration.charge_ai_copywriting(
+        db, current_user.id, uses_quota=usage_check.uses_quota
+    )
+    if not charged:
+        # 扣費失敗（極少發生，可能是並發導致餘額不足）
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="計費失敗，請稍後再試",
+        )
 
     # 提交交易
     await db.commit()
