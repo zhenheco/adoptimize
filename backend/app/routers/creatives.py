@@ -115,9 +115,15 @@ def _calculate_fatigue_from_metrics(creative_record: CreativeModel) -> tuple[int
     # 取得平均頻率
     avg_frequency = sum(float(m.frequency or 0) for m in sorted_metrics) / len(sorted_metrics)
 
-    # 計算轉換率變化
-    initial_conv_rate = float(sorted_metrics[0].conversion_rate or 0)
-    recent_conv_rate = float(sorted_metrics[-1].conversion_rate or 0)
+    # 計算轉換率變化（使用 conversions / clicks）
+    initial_clicks = sorted_metrics[0].clicks or 0
+    initial_conv = sorted_metrics[0].conversions or 0
+    initial_conv_rate = (initial_conv / initial_clicks) if initial_clicks > 0 else 0.0
+
+    recent_clicks = sorted_metrics[-1].clicks or 0
+    recent_conv = sorted_metrics[-1].conversions or 0
+    recent_conv_rate = (recent_conv / recent_clicks) if recent_clicks > 0 else 0.0
+
     if initial_conv_rate > 0:
         conversion_change = ((recent_conv_rate - initial_conv_rate) / initial_conv_rate) * 100
     else:

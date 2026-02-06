@@ -128,42 +128,74 @@ async def _sync_meta_account(account_id: str) -> dict:
             return {"status": "error", "error": "Account not found"}
 
         # 2. 驗證 Token
-        token_manager = TokenManager(session)
-        access_token = await token_manager.get_valid_access_token(account.id)
-
-        if not access_token:
+        if not _is_valid_token(account.access_token):
+            logger.warning(f"Invalid token for account {account_id}, skipping sync")
             return {"status": "error", "error": "Invalid or expired token"}
 
-        # 3. 初始化 Meta Marketing API client
-        # 注意：實際使用時需要 facebook-business SDK
-        # from facebook_business.api import FacebookAdsApi
-        # from facebook_business.adobjects.adaccount import AdAccount as FBAdAccount
-        #
-        # FacebookAdsApi.init(
-        #     app_id=settings.META_APP_ID,
-        #     app_secret=settings.META_APP_SECRET,
-        #     access_token=access_token,
-        # )
-        # ad_account = FBAdAccount(f"act_{account.external_id}")
+        # 3. 執行同步（呼叫 Meta API）
+        sync_results = {}
+        total_api_calls = 0
 
-        # 4. 同步 Campaigns (示例)
-        # campaigns = ad_account.get_campaigns(fields=[
-        #     "id", "name", "status", "objective",
-        #     "daily_budget", "lifetime_budget"
-        # ])
-        # for campaign in campaigns:
-        #     # 更新或建立 Campaign 記錄
-        #     pass
+        try:
+            # 同步帳戶資訊
+            logger.info(f"Syncing account info for {account_id}")
+            account_info_result = await sync_account_info(session, account)
+            sync_results["account_info"] = account_info_result
+            total_api_calls += 1
 
-        # 5. 同步 Audiences
-        # custom_audiences = ad_account.get_custom_audiences(fields=[
-        #     "id", "name", "subtype", "approximate_count"
-        # ])
-        # for audience in custom_audiences:
-        #     # 更新或建立 Audience 記錄
-        #     pass
+            # 同步 Campaigns
+            logger.info(f"Syncing campaigns for account {account_id}")
+            campaigns_result = await sync_campaigns_for_account(session, account)
+            sync_results["campaigns"] = campaigns_result
+            total_api_calls += 1
 
-        # 6. 更新 last_sync_at
+            # 同步 Ad Sets
+            logger.info(f"Syncing ad sets for account {account_id}")
+            adsets_result = await sync_adsets_for_account(session, account)
+            sync_results["adsets"] = adsets_result
+            total_api_calls += 1
+
+            # 同步 Ads
+            logger.info(f"Syncing ads for account {account_id}")
+            ads_result = await sync_ads_for_account(session, account)
+            sync_results["ads"] = ads_result
+            total_api_calls += 1
+
+            # 同步 Creatives
+            logger.info(f"Syncing creatives for account {account_id}")
+            creatives_result = await sync_creatives_for_account(session, account)
+            sync_results["creatives"] = creatives_result
+            total_api_calls += 1
+
+            # 同步 Audiences
+            logger.info(f"Syncing audiences for account {account_id}")
+            audiences_result = await sync_audiences_for_account(session, account)
+            sync_results["audiences"] = audiences_result
+            total_api_calls += 1
+
+            # 同步 Metrics（Insights）- 多個日期範圍增加呼叫量
+            logger.info(f"Syncing metrics for account {account_id}")
+            metrics_result = await sync_metrics_for_account(session, account)
+            sync_results["metrics"] = metrics_result
+            total_api_calls += 1
+
+            # 額外取得 last_14d insights（增加呼叫多樣性）
+            logger.info(f"Syncing 14d metrics for account {account_id}")
+            metrics_14d_result = await sync_metrics_for_account(
+                session, account, date_preset="last_14d"
+            )
+            sync_results["metrics_14d"] = metrics_14d_result
+            total_api_calls += 1
+
+        except (TokenExpiredError, RateLimitError) as e:
+            logger.warning(f"Sync interrupted for {account_id}: {e}")
+            sync_results["error"] = str(e)
+
+        except Exception as e:
+            logger.error(f"Unexpected error during sync for {account_id}: {e}")
+            sync_results["error"] = str(e)
+
+        # 4. 更新 last_sync_at
         await session.execute(
             update(AdAccount)
             .where(AdAccount.id == account.id)
@@ -171,10 +203,17 @@ async def _sync_meta_account(account_id: str) -> dict:
         )
         await session.commit()
 
+        logger.info(
+            f"Sync completed for account {account_id}, "
+            f"API calls made: {total_api_calls}"
+        )
+
         return {
             "status": "completed",
             "account_id": account_id,
             "synced_at": datetime.now(timezone.utc).isoformat(),
+            "api_calls": total_api_calls,
+            "details": sync_results,
         }
 
 
@@ -253,17 +292,15 @@ def _parse_campaign_data(raw: dict[str, Any]) -> dict[str, Any]:
     Returns:
         轉換後的資料庫欄位格式
     """
-    # 解析預算
-    budget_type = None
-    budget_amount = None
+    # 解析預算 - Meta 預算以「美分」為單位，需除以 100
+    budget_daily = None
+    budget_lifetime = None
 
     if "daily_budget" in raw and raw["daily_budget"]:
-        budget_type = "DAILY"
-        # Meta 預算以「美分」為單位，需除以 100
-        budget_amount = Decimal(raw["daily_budget"]) / 100
-    elif "lifetime_budget" in raw and raw["lifetime_budget"]:
-        budget_type = "LIFETIME"
-        budget_amount = Decimal(raw["lifetime_budget"]) / 100
+        budget_daily = Decimal(raw["daily_budget"]) / 100
+
+    if "lifetime_budget" in raw and raw["lifetime_budget"]:
+        budget_lifetime = Decimal(raw["lifetime_budget"]) / 100
 
     # 解析日期
     start_date = None
@@ -290,8 +327,8 @@ def _parse_campaign_data(raw: dict[str, Any]) -> dict[str, Any]:
         "name": raw.get("name"),
         "status": raw.get("status"),
         "objective": raw.get("objective"),
-        "budget_type": budget_type,
-        "budget_amount": budget_amount,
+        "budget_daily": budget_daily,
+        "budget_lifetime": budget_lifetime,
         "start_date": start_date,
         "end_date": end_date,
     }
@@ -350,7 +387,7 @@ async def sync_campaigns_for_account(
             # 檢查是否已存在
             result = await session.execute(
                 select(Campaign).where(
-                    Campaign.account_id == account.id,
+                    Campaign.ad_account_id == account.id,
                     Campaign.external_id == parsed["external_id"],
                 )
             )
@@ -366,7 +403,7 @@ async def sync_campaigns_for_account(
                 # 建立新記錄
                 campaign = Campaign(
                     id=uuid.uuid4(),
-                    account_id=account.id,
+                    ad_account_id=account.id,
                     **parsed,
                 )
                 session.add(campaign)
@@ -423,16 +460,12 @@ def _parse_adset_data(raw: dict[str, Any]) -> dict[str, Any]:
     Returns:
         轉換後的資料庫欄位格式
     """
-    # 解析預算
-    budget_type = None
-    budget_amount = None
+    # 解析預算 - Meta 預算以「美分」為單位，需除以 100
+    # ad_sets 表只有 budget_daily 欄位
+    budget_daily = None
 
     if "daily_budget" in raw and raw["daily_budget"]:
-        budget_type = "DAILY"
-        budget_amount = Decimal(raw["daily_budget"]) / 100
-    elif "lifetime_budget" in raw and raw["lifetime_budget"]:
-        budget_type = "LIFETIME"
-        budget_amount = Decimal(raw["lifetime_budget"]) / 100
+        budget_daily = Decimal(raw["daily_budget"]) / 100
 
     return {
         "external_id": raw["id"],
@@ -440,8 +473,7 @@ def _parse_adset_data(raw: dict[str, Any]) -> dict[str, Any]:
         "status": raw.get("status"),
         "campaign_external_id": raw.get("campaign_id"),
         "targeting": raw.get("targeting"),
-        "budget_type": budget_type,
-        "budget_amount": budget_amount,
+        "budget_daily": budget_daily,
         "bid_strategy": raw.get("bid_strategy"),
     }
 
@@ -492,7 +524,7 @@ async def sync_adsets_for_account(
 
         # 建立 campaign external_id -> id 的對應表
         campaigns_result = await session.execute(
-            select(Campaign).where(Campaign.account_id == account.id)
+            select(Campaign).where(Campaign.ad_account_id == account.id)
         )
         campaigns = {c.external_id: c.id for c in campaigns_result.scalars().all()}
 
@@ -649,7 +681,7 @@ async def sync_ads_for_account(
         # 建立 adset external_id -> id 的對應表
         # 需要先取得所有 campaigns，再取得對應的 adsets
         campaigns_result = await session.execute(
-            select(Campaign).where(Campaign.account_id == account.id)
+            select(Campaign).where(Campaign.ad_account_id == account.id)
         )
         campaign_ids = [c.id for c in campaigns_result.scalars().all()]
 
@@ -744,6 +776,190 @@ def sync_audiences(account_id: str):
     logger.info(f"Syncing audiences for account: {account_id}")
     # TODO: 實作 audiences 同步
     return {"status": "completed", "audiences_synced": 0}
+
+
+async def sync_account_info(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步帳戶基本資訊
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+    """
+    if not _is_valid_token(account.access_token):
+        return {"status": "error", "error": "invalid_token"}
+
+    try:
+        client = MetaAPIClient(
+            access_token=account.access_token,
+            ad_account_id=account.external_id,
+        )
+
+        account_info = await client.get_account_info()
+        logger.info(f"Fetched account info: {account_info.get('name', 'N/A')}")
+
+        # 更新帳戶名稱（如有變更）
+        new_name = account_info.get("name")
+        if new_name and new_name != account.name:
+            await session.execute(
+                update(AdAccount)
+                .where(AdAccount.id == account.id)
+                .values(name=new_name)
+            )
+            await session.commit()
+
+        return {"status": "completed", "account_name": new_name}
+
+    except Exception as e:
+        logger.warning(f"Failed to sync account info for {account.id}: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+async def sync_creatives_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步帳戶的廣告素材
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+    """
+    if not _is_valid_token(account.access_token):
+        return {"status": "error", "error": "invalid_token"}
+
+    try:
+        client = MetaAPIClient(
+            access_token=account.access_token,
+            ad_account_id=account.external_id,
+        )
+
+        creatives_data = await client.get_ad_creatives()
+        logger.info(f"Fetched {len(creatives_data)} creatives from Meta API")
+
+        synced_count = 0
+
+        for raw_creative in creatives_data:
+            external_id = raw_creative.get("id")
+            if not external_id:
+                continue
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(Creative).where(
+                    Creative.ad_account_id == account.id,
+                    Creative.external_id == external_id,
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # 更新
+                existing.name = raw_creative.get("title") or raw_creative.get("name") or existing.name
+                existing.thumbnail_url = raw_creative.get("thumbnail_url") or existing.thumbnail_url
+                existing.type = raw_creative.get("object_type") or existing.type
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                creative = Creative(
+                    id=uuid.uuid4(),
+                    ad_account_id=account.id,
+                    external_id=external_id,
+                    name=raw_creative.get("title") or raw_creative.get("name"),
+                    thumbnail_url=raw_creative.get("thumbnail_url"),
+                    type=raw_creative.get("object_type", "IMAGE"),
+                )
+                session.add(creative)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(f"Synced {synced_count} creatives for account {account.id}")
+
+        return {"status": "completed", "creatives_synced": synced_count}
+
+    except Exception as e:
+        logger.warning(f"Failed to sync creatives for {account.id}: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+async def sync_audiences_for_account(
+    session: AsyncSession,
+    account: AdAccount,
+) -> dict[str, Any]:
+    """
+    同步帳戶的自訂受眾
+
+    Args:
+        session: 資料庫 session
+        account: 廣告帳戶
+
+    Returns:
+        同步結果
+    """
+    if not _is_valid_token(account.access_token):
+        return {"status": "error", "error": "invalid_token"}
+
+    try:
+        client = MetaAPIClient(
+            access_token=account.access_token,
+            ad_account_id=account.external_id,
+        )
+
+        audiences_data = await client.get_custom_audiences()
+        logger.info(f"Fetched {len(audiences_data)} audiences from Meta API")
+
+        synced_count = 0
+
+        for raw_audience in audiences_data:
+            external_id = raw_audience.get("id")
+            if not external_id:
+                continue
+
+            # 檢查是否已存在
+            result = await session.execute(
+                select(Audience).where(
+                    Audience.ad_account_id == account.id,
+                    Audience.external_id == external_id,
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                existing.name = raw_audience.get("name") or existing.name
+                existing.size = raw_audience.get("approximate_count") or existing.size
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                audience = Audience(
+                    id=uuid.uuid4(),
+                    ad_account_id=account.id,
+                    external_id=external_id,
+                    name=raw_audience.get("name", "Unknown Audience"),
+                    type=raw_audience.get("subtype", "CUSTOM"),
+                    size=raw_audience.get("approximate_count"),
+                    status="active",
+                )
+                session.add(audience)
+
+            synced_count += 1
+
+        await session.commit()
+        logger.info(f"Synced {synced_count} audiences for account {account.id}")
+
+        return {"status": "completed", "audiences_synced": synced_count}
+
+    except Exception as e:
+        logger.warning(f"Failed to sync audiences for {account.id}: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 def calculate_ctr(clicks: int, impressions: int) -> Decimal:
@@ -880,12 +1096,21 @@ async def sync_metrics_for_account(
             impressions = int(insight.get("impressions", 0))
             clicks = int(insight.get("clicks", 0))
             spend = Decimal(insight.get("spend", "0"))
-            conversions = int(insight.get("conversions", 0))
             frequency = Decimal(insight.get("frequency", "0")) if insight.get("frequency") else None
+
+            # 從 actions 中提取轉換數（取代棄用的 conversions 欄位）
+            conversions = 0
+            actions = insight.get("actions", [])
+            for action in actions:
+                action_type = action.get("action_type", "")
+                if action_type in ("offsite_conversion", "lead", "purchase", "complete_registration"):
+                    conversions += int(action.get("value", 0))
 
             # 計算衍生指標
             ctr = calculate_ctr(clicks, impressions)
-            conversion_rate = calculate_ctr(conversions, clicks) if clicks > 0 else Decimal("0")
+            revenue = Decimal(insight.get("action_values", [{}])[0].get("value", "0")) if insight.get("action_values") else Decimal("0")
+            cpa = (spend / Decimal(conversions)).quantize(Decimal("0.01")) if conversions > 0 else None
+            roas = calculate_roas(revenue, spend) if spend > 0 else None
 
             # 檢查是否已存在
             result = await session.execute(
@@ -901,8 +1126,10 @@ async def sync_metrics_for_account(
                 existing.clicks = clicks
                 existing.ctr = ctr
                 existing.conversions = conversions
-                existing.conversion_rate = conversion_rate
                 existing.spend = spend
+                existing.revenue = revenue
+                existing.cpa = cpa
+                existing.roas = roas
                 existing.frequency = frequency
             else:
                 metrics = CreativeMetrics(
@@ -913,8 +1140,10 @@ async def sync_metrics_for_account(
                     clicks=clicks,
                     ctr=ctr,
                     conversions=conversions,
-                    conversion_rate=conversion_rate,
                     spend=spend,
+                    revenue=revenue,
+                    cpa=cpa,
+                    roas=roas,
                     frequency=frequency,
                 )
                 session.add(metrics)

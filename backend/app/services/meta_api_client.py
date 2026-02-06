@@ -30,6 +30,10 @@ from app.core.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+# 降低 httpx 日誌等級，避免 access_token 在 URL 中被記錄
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 class MetaAPIClient:
     """
@@ -92,9 +96,8 @@ class MetaAPIClient:
         "ctr",
         "reach",
         "frequency",
-        "conversions",
-        "cost_per_conversion",
         "actions",
+        "cost_per_action_type",
         "action_values",
     ]
 
@@ -142,9 +145,25 @@ class MetaAPIClient:
             **(params or {}),
         }
 
+        # 記錄 API 呼叫（不含 access_token）
+        safe_params = {k: v for k, v in request_params.items() if k != "access_token"}
+        logger.debug(f"Meta API request: {endpoint}, params: {safe_params}")
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, params=request_params)
-            return response.json()
+            result = response.json()
+
+        # 記錄回應狀態
+        if "error" in result:
+            logger.warning(
+                f"Meta API error for {endpoint}: "
+                f"code={result['error'].get('code')}, "
+                f"message={result['error'].get('message', '')[:100]}"
+            )
+        else:
+            logger.debug(f"Meta API success: {endpoint}, status={response.status_code}")
+
+        return result
 
     async def _make_request(
         self,
@@ -484,3 +503,57 @@ class MetaAPIClient:
             )
 
         return result
+
+    async def get_account_info(self) -> dict[str, Any]:
+        """
+        取得廣告帳戶基本資訊
+
+        Returns:
+            帳戶資訊（id, name, currency, timezone 等）
+        """
+        endpoint = self.ad_account_id
+        params = {
+            "fields": "id,name,account_status,currency,timezone_name,amount_spent,balance",
+        }
+
+        logger.info(f"Fetching account info for {self.ad_account_id}")
+        result = await self._make_request(endpoint, params)
+        return result
+
+    async def get_ad_creatives(
+        self,
+        fields: Optional[list[str]] = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """
+        取得廣告素材
+
+        Args:
+            fields: 要取得的欄位
+            limit: 每頁數量
+
+        Returns:
+            廣告素材列表
+        """
+        default_fields = [
+            "id",
+            "name",
+            "status",
+            "thumbnail_url",
+            "object_type",
+            "title",
+            "body",
+            "image_url",
+        ]
+
+        endpoint = f"{self.ad_account_id}/adcreatives"
+        params = {
+            "fields": ",".join(fields or default_fields),
+            "limit": limit,
+        }
+
+        logger.info(f"Fetching ad creatives for {self.ad_account_id}")
+        creatives = await self._fetch_all_pages(endpoint, params)
+        logger.info(f"Fetched {len(creatives)} ad creatives")
+
+        return creatives

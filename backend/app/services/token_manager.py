@@ -27,8 +27,8 @@ logger = get_logger(__name__)
 # Google OAuth 端點
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
-# Meta OAuth 端點
-META_TOKEN_URL = "https://graph.facebook.com/v18.0/oauth/access_token"
+# Meta OAuth 端點（統一使用 v21.0）
+META_TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token"
 
 # TikTok OAuth 端點
 TIKTOK_REFRESH_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/refresh_token/"
