@@ -46,10 +46,10 @@ class AdSet(Base):
         comment="受眾設定 JSON",
     )
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    budget_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    budget_amount: Mapped[Decimal | None] = mapped_column(
-        Numeric(15, 2),
+    budget_daily: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
         nullable=True,
+        comment="每日預算",
     )
     bid_strategy: Mapped[str | None] = mapped_column(
         String(100),

@@ -46,11 +46,22 @@ class CreativeMetrics(Base):
         comment="Click-through rate",
     )
     conversions: Mapped[int] = mapped_column(Integer, default=0)
-    conversion_rate: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 6),
-        nullable=True,
+    spend: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
+    revenue: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        default=Decimal("0"),
+        comment="轉換收入",
     )
-    spend: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
+    cpa: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+        comment="Cost Per Acquisition",
+    )
+    roas: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 2),
+        nullable=True,
+        comment="Return on Ad Spend",
+    )
     frequency: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,

@@ -28,7 +28,7 @@ class Audience(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    account_id: Mapped[uuid.UUID] = mapped_column(
+    ad_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ad_accounts.id", ondelete="CASCADE"),
         nullable=False,
@@ -49,15 +49,10 @@ class Audience(Base):
         nullable=True,
         comment="受眾規模",
     )
-    source: Mapped[str | None] = mapped_column(
-        String(100),
+    status: Mapped[str | None] = mapped_column(
+        String(50),
         nullable=True,
-        comment="來源: WEBSITE, CUSTOMER_LIST, APP, etc.",
-    )
-    lookalike_source_id: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True,
-        comment="Lookalike 來源受眾 ID",
+        comment="狀態: active, archived",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -29,7 +29,7 @@ class Campaign(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    account_id: Mapped[uuid.UUID] = mapped_column(
+    ad_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ad_accounts.id", ondelete="CASCADE"),
         nullable=False,
@@ -50,14 +50,15 @@ class Campaign(Base):
         nullable=True,
         comment="狀態: ENABLED, PAUSED, REMOVED",
     )
-    budget_type: Mapped[str | None] = mapped_column(
-        String(50),
+    budget_daily: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
         nullable=True,
-        comment="預算類型: DAILY, LIFETIME",
+        comment="每日預算",
     )
-    budget_amount: Mapped[Decimal | None] = mapped_column(
-        Numeric(15, 2),
+    budget_lifetime: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
         nullable=True,
+        comment="總預算",
     )
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)

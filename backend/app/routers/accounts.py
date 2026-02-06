@@ -96,13 +96,15 @@ async def get_accounts(
     # 建立查詢
     query = select(AdAccount)
 
+    # 預設排除已移除的帳戶
+    if status:
+        query = query.where(AdAccount.status == status.lower())
+    else:
+        query = query.where(AdAccount.status != "removed")
+
     # 平台篩選
     if platform:
         query = query.where(AdAccount.platform == platform.lower())
-
-    # 狀態篩選
-    if status:
-        query = query.where(AdAccount.status == status.lower())
 
     # 排序（最新在前）
     query = query.order_by(AdAccount.created_at.desc())
@@ -196,7 +198,7 @@ async def delete_account(
     # 清除敏感資訊
     account_record.access_token = None
     account_record.refresh_token = None
-    await db.flush()
+    await db.commit()
 
     return AccountDeleteResponse(
         success=True,

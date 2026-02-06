@@ -15,7 +15,6 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.ad_set import AdSet
-    from app.models.creative import Creative
 
 
 class Ad(Base):
@@ -39,11 +38,6 @@ class Ad(Base):
         index=True,
     )
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    creative_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("creatives.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -57,7 +51,3 @@ class Ad(Base):
 
     # 關聯
     ad_set: Mapped["AdSet"] = relationship("AdSet", back_populates="ads")
-    creative: Mapped["Creative | None"] = relationship(
-        "Creative",
-        back_populates="ads",
-    )

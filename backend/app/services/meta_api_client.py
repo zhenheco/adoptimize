@@ -523,7 +523,7 @@ class MetaAPIClient:
     async def get_ad_creatives(
         self,
         fields: Optional[list[str]] = None,
-        limit: int = 100,
+        limit: int = 25,
     ) -> list[dict[str, Any]]:
         """
         取得廣告素材

@@ -502,13 +502,30 @@ function AccountsContent() {
   /**
    * 中斷帳戶連結
    */
-  const handleDisconnect = (id: string) => {
-    // TODO: 呼叫 API 中斷連結
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-    setToast({
-      type: 'success',
-      message: '已中斷帳戶連結',
-    });
+  const handleDisconnect = async (id: string) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/accounts/${id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error(`斷開連接失敗: ${response.status}`);
+      }
+
+      // API 成功後才更新 UI
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      setToast({
+        type: 'success',
+        message: '已中斷帳戶連結',
+      });
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : '中斷連結失敗，請稍後再試',
+      });
+    }
     setTimeout(() => setToast(null), 3000);
   };
 

@@ -14,7 +14,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.models.ad import Ad
     from app.models.ad_account import AdAccount
     from app.models.creative_metrics import CreativeMetrics
 
@@ -82,7 +81,6 @@ class Creative(Base):
 
     # 關聯
     account: Mapped["AdAccount"] = relationship("AdAccount", back_populates="creatives")
-    ads: Mapped[list["Ad"]] = relationship("Ad", back_populates="creative")
     metrics: Mapped[list["CreativeMetrics"]] = relationship(
         "CreativeMetrics",
         back_populates="creative",
