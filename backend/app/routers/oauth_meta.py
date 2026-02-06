@@ -36,10 +36,10 @@ except ImportError:
 
 router = APIRouter()
 
-# Meta OAuth 端點（統一使用 v21.0）
-META_AUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth"
-META_TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token"
-META_GRAPH_URL = "https://graph.facebook.com/v21.0"
+# Meta OAuth 端點（統一使用 v24.0）
+META_AUTH_URL = "https://www.facebook.com/v24.0/dialog/oauth"
+META_TOKEN_URL = "https://graph.facebook.com/v24.0/oauth/access_token"
+META_GRAPH_URL = "https://graph.facebook.com/v24.0"
 
 # Meta Marketing API 所需的權限
 # 注意：read_insights 是 Pages API 的權限，不適用於 Marketing API

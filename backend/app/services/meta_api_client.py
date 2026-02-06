@@ -45,7 +45,7 @@ class MetaAPIClient:
     封裝 Graph API 呼叫，處理分頁、重試和錯誤。
     """
 
-    BASE_URL = "https://graph.facebook.com/v21.0"
+    BASE_URL = "https://graph.facebook.com/v24.0"
     DEFAULT_TIMEOUT = 30.0
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0  # 秒
@@ -185,6 +185,16 @@ class MetaAPIClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, params=request_params)
             result = response.json()
+
+        # 記錄 X-App-Usage / X-Ad-Account-Usage header 以確認 API 呼叫歸屬
+        app_usage = response.headers.get("X-App-Usage", "")
+        ad_account_usage = response.headers.get("X-Ad-Account-Usage", "")
+        if app_usage or ad_account_usage:
+            logger.info(
+                f"Meta API usage for {endpoint}: "
+                f"X-App-Usage={app_usage}, "
+                f"X-Ad-Account-Usage={ad_account_usage}"
+            )
 
         # 記錄回應狀態
         if "error" in result:
