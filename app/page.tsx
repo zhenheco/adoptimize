@@ -26,8 +26,17 @@ export default function HomePage() {
         </div>
       </main>
 
-      <footer className="absolute bottom-4 text-gray-500 text-sm">
-        <p>廣告船長 v0.1.0 - Development Build</p>
+      <footer className="absolute bottom-4 text-gray-500 text-sm text-center">
+        <p className="mb-1">廣告船長 v0.1.0</p>
+        <div className="flex gap-3 justify-center">
+          <Link href="/privacy" className="hover:text-gray-700 dark:hover:text-gray-300 underline">
+            隱私權政策
+          </Link>
+          <span>|</span>
+          <Link href="/terms" className="hover:text-gray-700 dark:hover:text-gray-300 underline">
+            服務條款
+          </Link>
+        </div>
       </footer>
     </div>
   );
