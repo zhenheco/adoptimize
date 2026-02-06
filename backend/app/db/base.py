@@ -115,22 +115,28 @@ async def get_db() -> AsyncSession:
 
     當資料庫連線失敗時，返回 MockAsyncSession，
     路由應該捕獲異常並返回 mock data。
+
+    注意：此 generator 只能 yield 一次，否則會導致
+    RuntimeError: generator didn't stop after athrow()
     """
     if not _db_available or async_session_maker is None:
         logger.warning("Database not available, using mock session")
         yield MockAsyncSession()
         return
 
+    # 分離 session 建立和 yield，避免雙重 yield bug
     try:
-        async with async_session_maker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
+        session = async_session_maker()
     except Exception as e:
         logger.warning(f"Database session creation failed: {e}, using mock session")
         yield MockAsyncSession()
+        return
+
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()

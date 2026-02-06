@@ -47,4 +47,31 @@ Ralph 框架使用三個核心文件：
 
 ---
 
+### 2026-02-06 - LinkedIn Ads 整合上線 + get_db 雙重 yield 修復
+
+**問題描述：**
+1. LinkedIn Marketing API 審核通過後，需要設定環境變數並測試 OAuth 連接流程
+2. 測試時發現點擊「連結 LinkedIn Ads」出現 Internal Server Error（500）
+
+**解決方案：**
+1. 設定 Fly.io secrets 和本地 .env 的 LinkedIn 憑證
+2. 發現兩個根本原因：
+   - JWT token 過期（登入後 7 小時）
+   - `get_db()` async generator 有雙重 yield bug：當路由拋出 HTTPException 時，外層 try/except 會嘗試 yield 第二次 MockAsyncSession，導致 `RuntimeError: generator didn't stop after athrow()`
+3. 修正 `get_db()` 為分離式結構：session 建立失敗時 yield + return，成功時走正常的 yield/commit/rollback 流程
+4. 部署修正後，引導用戶在 LinkedIn Developer Portal 新增 redirect URL
+5. 完成端到端 OAuth 授權測試
+
+**影響範圍：**
+- `backend/app/db/base.py` - 修正 `get_db()` 函數
+- `backend/.env` - 新增 LinkedIn 憑證
+- Fly.io secrets - 新增 `LINKEDIN_CLIENT_ID` 和 `LINKEDIN_CLIENT_SECRET`
+
+**學習經驗：**
+- Python async generator 每條執行路徑只能有一個 yield 點，否則 athrow() 會導致 RuntimeError
+- LinkedIn OAuth redirect URL 必須完全匹配（包含路徑），需在 Developer Portal 預先註冊
+- 測試 OAuth 流程前要確保 JWT token 未過期
+
+---
+
 <!-- 在此下方新增新的開發紀錄 -->
