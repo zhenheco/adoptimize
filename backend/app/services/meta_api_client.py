@@ -17,11 +17,14 @@ Meta Graph API Client
 """
 
 import asyncio
+import hashlib
+import hmac
 import logging
 from typing import Any, Optional
 
 import httpx
 
+from app.core.config import get_settings
 from app.core.exceptions import (
     MetaAPIError,
     RateLimitError,
@@ -123,6 +126,32 @@ class MetaAPIClient:
         if not ad_account_id.startswith("act_"):
             self.ad_account_id = f"act_{ad_account_id}"
 
+        # 產生 appsecret_proof，讓 Meta 能將 API 呼叫歸屬到我們的 App
+        settings = get_settings()
+        self._app_secret = settings.META_APP_SECRET
+        self._appsecret_proof = self._generate_appsecret_proof()
+
+    def _generate_appsecret_proof(self) -> Optional[str]:
+        """
+        產生 appsecret_proof (HMAC-SHA256)
+
+        Meta 使用此參數驗證 API 呼叫來自合法的 App Server，
+        並將呼叫次數歸屬到 App。缺少此參數會導致 App Review
+        Dashboard 顯示 0 次 API 呼叫。
+
+        Returns:
+            HMAC-SHA256 簽名字串，或 None（如果沒有 app_secret）
+        """
+        if not self._app_secret:
+            logger.warning("META_APP_SECRET not configured, appsecret_proof disabled")
+            return None
+
+        return hmac.new(
+            self._app_secret.encode("utf-8"),
+            self.access_token.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
     async def _make_raw_request(
         self,
         endpoint: str,
@@ -145,8 +174,12 @@ class MetaAPIClient:
             **(params or {}),
         }
 
-        # 記錄 API 呼叫（不含 access_token）
-        safe_params = {k: v for k, v in request_params.items() if k != "access_token"}
+        # 加入 appsecret_proof 讓 Meta 歸屬 API 呼叫到我們的 App
+        if self._appsecret_proof:
+            request_params["appsecret_proof"] = self._appsecret_proof
+
+        # 記錄 API 呼叫（不含敏感資訊）
+        safe_params = {k: v for k, v in request_params.items() if k not in ("access_token", "appsecret_proof")}
         logger.debug(f"Meta API request: {endpoint}, params: {safe_params}")
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -483,13 +516,17 @@ class MetaAPIClient:
 
         logger.info(f"Updating ad {ad_id} status to {status}")
 
+        post_data: dict[str, str] = {
+            "access_token": self.access_token,
+            "status": status,
+        }
+        if self._appsecret_proof:
+            post_data["appsecret_proof"] = self._appsecret_proof
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.BASE_URL}/{endpoint}",
-                data={
-                    "access_token": self.access_token,
-                    "status": status,
-                },
+                data=post_data,
             )
             result = response.json()
 
