@@ -818,6 +818,7 @@ async def sync_account_info(
 
     except Exception as e:
         logger.warning(f"Failed to sync account info for {account.id}: {e}")
+        await session.rollback()
         return {"status": "error", "error": str(e)}
 
 
@@ -868,6 +869,7 @@ async def sync_creatives_for_account(
                 existing.name = raw_creative.get("title") or raw_creative.get("name") or existing.name
                 existing.thumbnail_url = raw_creative.get("thumbnail_url") or existing.thumbnail_url
                 existing.type = raw_creative.get("object_type") or existing.type
+                existing.status = raw_creative.get("status") or existing.status or "ACTIVE"
                 existing.updated_at = datetime.now(timezone.utc)
             else:
                 creative = Creative(
@@ -877,6 +879,7 @@ async def sync_creatives_for_account(
                     name=raw_creative.get("title") or raw_creative.get("name"),
                     thumbnail_url=raw_creative.get("thumbnail_url"),
                     type=raw_creative.get("object_type", "IMAGE"),
+                    status=raw_creative.get("status", "ACTIVE"),
                 )
                 session.add(creative)
 
@@ -889,6 +892,7 @@ async def sync_creatives_for_account(
 
     except Exception as e:
         logger.warning(f"Failed to sync creatives for {account.id}: {e}")
+        await session.rollback()
         return {"status": "error", "error": str(e)}
 
 
@@ -959,6 +963,7 @@ async def sync_audiences_for_account(
 
     except Exception as e:
         logger.warning(f"Failed to sync audiences for {account.id}: {e}")
+        await session.rollback()
         return {"status": "error", "error": str(e)}
 
 
