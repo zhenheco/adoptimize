@@ -22,7 +22,7 @@ export default function PrivacyPage() {
             隱私政策
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            最後更新日期：2026 年 1 月 13 日
+            最後更新日期：2026 年 2 月 9 日
           </p>
         </div>
       </header>
@@ -189,16 +189,91 @@ export default function PrivacyPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-4">
-                我們不會將您的資料出售給第三方。資料僅在提供服務所必需時與上述平台交互。
+            </div>
+          </section>
+
+          {/* 資料分享、轉移與揭露 */}
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              6. 資料分享、轉移與揭露
+            </h2>
+            <div className="space-y-4 text-gray-700 dark:text-gray-300">
+              <p>
+                <strong>我們不會出售您的個人資料或 Google 用戶資料給任何第三方。</strong>
               </p>
+
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  6.1 我們可能分享資料的對象
+                </h3>
+                <p className="mt-2">
+                  我們僅在以下有限情況下，與以下對象分享、轉移或揭露您的資料：
+                </p>
+                <ul className="mt-2 list-disc list-inside space-y-2">
+                  <li>
+                    <strong>雲端基礎設施提供商：</strong>我們使用
+                    Supabase（資料庫託管）、Vercel（前端託管）和
+                    Fly.io（後端託管）來運行本服務。這些提供商可能會在提供基礎設施服務的過程中處理您的資料，但不會將您的資料用於其自身目的。
+                  </li>
+                  <li>
+                    <strong>廣告平台 API：</strong>當您授權連接 Google Ads
+                    或 Meta 廣告帳戶時，我們會透過其官方 API
+                    讀取您的廣告數據。我們不會將您的 Google
+                    用戶資料傳送給這些平台，僅從這些平台讀取資料。
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  6.2 法律要求的揭露
+                </h3>
+                <p className="mt-2">
+                  我們可能在以下情況下揭露您的資料：
+                </p>
+                <ul className="mt-2 list-disc list-inside space-y-2">
+                  <li>遵守適用法律、法規或法律程序的要求</li>
+                  <li>回應合法的政府請求（如法院命令或傳票）</li>
+                  <li>保護 AdOptimize、我們的用戶或公眾的權利、財產或安全</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  6.3 業務轉讓
+                </h3>
+                <p className="mt-2">
+                  如果 AdOptimize
+                  涉及合併、收購或資產出售，您的資料可能會作為交易的一部分被轉移。在此情況下，我們會在資料轉移前通知您，並確保接收方遵守與本隱私政策同等的保護標準。
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  6.4 我們不會進行的行為
+                </h3>
+                <ul className="mt-2 list-disc list-inside space-y-2">
+                  <li>我們不會出售或出租您的個人資料或 Google 用戶資料</li>
+                  <li>
+                    我們不會將 Google 用戶資料用於向您投放廣告
+                  </li>
+                  <li>
+                    我們不會將 Google
+                    用戶資料分享給與提供或改進本服務無關的第三方
+                  </li>
+                  <li>
+                    我們不會允許人工讀取 Google
+                    用戶資料，除非取得您的明確同意、出於安全目的、遵守法律要求，或資料已匿名化處理
+                  </li>
+                </ul>
+              </div>
             </div>
           </section>
 
           {/* Cookie */}
           <section>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              6. Cookie 使用
+              7. Cookie 使用
             </h2>
             <div className="space-y-4 text-gray-700 dark:text-gray-300">
               <p>本服務使用 Cookie 和類似技術來：</p>
@@ -217,7 +292,7 @@ export default function PrivacyPage() {
           {/* 用戶權利 */}
           <section>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              7. 您的權利
+              8. 您的權利
             </h2>
             <div className="space-y-4 text-gray-700 dark:text-gray-300">
               <p>根據適用的隱私法規，您享有以下權利：</p>
@@ -250,7 +325,7 @@ export default function PrivacyPage() {
           {/* 政策變更 */}
           <section>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              8. 政策變更
+              9. 政策變更
             </h2>
             <p className="text-gray-700 dark:text-gray-300">
               我們可能會不時更新本隱私政策。如有重大變更，我們會透過電子郵件或服務內通知告知您。建議您定期查閱本政策以了解最新內容。
@@ -260,7 +335,7 @@ export default function PrivacyPage() {
           {/* 聯絡方式 */}
           <section>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              9. 聯絡我們
+              10. 聯絡我們
             </h2>
             <div className="text-gray-700 dark:text-gray-300">
               <p>如果您對本隱私政策有任何疑問或需要行使您的權利，請聯絡：</p>
