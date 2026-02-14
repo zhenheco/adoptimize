@@ -6,13 +6,13 @@
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import async_session_maker
+from app.db.base import async_session_maker
 from app.models.report import Report
 from app.models.user import User
 
@@ -214,14 +214,9 @@ class ReportGenerator:
 
         TODO: 整合 OpenAI API
         """
-        # Placeholder
         spend = content.get("spend", 0)
         conversions = content.get("conversions", 0)
         roas = content.get("roas", 0)
 
-        if report_type == "daily":
-            return f"今日花費 ${spend:,.0f}，帶來 {conversions} 筆訂單，投報率 {roas:.1f} 倍。"
-        elif report_type == "weekly":
-            return f"本週花費 ${spend:,.0f}，帶來 {conversions} 筆訂單，投報率 {roas:.1f} 倍。"
-        else:
-            return f"本月花費 ${spend:,.0f}，帶來 {conversions} 筆訂單，投報率 {roas:.1f} 倍。"
+        period_label = {"daily": "今日", "weekly": "本週"}.get(report_type, "本月")
+        return f"{period_label}花費 ${spend:,.0f}，帶來 {conversions} 筆訂單，投報率 {roas:.1f} 倍。"

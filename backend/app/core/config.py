@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: Optional[str] = None
     LINKEDIN_CLIENT_SECRET: Optional[str] = None
 
+    # Pinterest Ads API 設定
+    PINTEREST_APP_ID: Optional[str] = None
+    PINTEREST_APP_SECRET: Optional[str] = None
+
     # CORS 設定 (存為字串，支援逗號分隔格式)
     CORS_ORIGINS: str = "http://localhost:3000"
 

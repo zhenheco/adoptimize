@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-LinkedIn Ads OAuth 路由
+Pinterest Ads OAuth 路由
 
-實作 LinkedIn OAuth 2.0 授權流程：
+實作 Pinterest OAuth 2.0 授權流程：
 1. 產生授權 URL
 2. 處理 OAuth 回調
 3. 刷新 Token
+
+Pinterest OAuth 特點：
+- Authorization URL: https://www.pinterest.com/oauth/
+- Token URL: https://api.pinterest.com/v5/oauth/token
+- 使用 Basic Auth（client_id:client_secret）交換 token
+- Access Token 有效期 30 天，支援 refresh token
 """
 
+import base64
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import UUID
@@ -30,17 +37,16 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
-# LinkedIn OAuth 端點
-LINKEDIN_AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
-LINKEDIN_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
+# Pinterest OAuth 端點
+PINTEREST_AUTH_URL = "https://www.pinterest.com/oauth/"
+PINTEREST_TOKEN_URL = "https://api.pinterest.com/v5/oauth/token"
 
-# LinkedIn Marketing API 所需的權限
-# 參考: https://learn.microsoft.com/en-us/linkedin/marketing/getting-started
-LINKEDIN_SCOPES = [
-    "r_ads",           # 讀取廣告帳戶
-    "rw_ads",          # 讀寫廣告
-    "r_basicprofile",  # 讀取基本資料（已棄用，但某些應用仍需要）
-    "r_organization_admin",  # 讀取組織管理權限
+# Pinterest Ads API 所需的權限
+PINTEREST_SCOPES = [
+    "ads:read",              # 讀取廣告數據
+    "user_accounts:read",    # 讀取使用者帳號資訊
+    "boards:read",           # 讀取看板（用於素材分析）
+    "pins:read",             # 讀取 Pin（用於素材分析）
 ]
 
 
@@ -69,6 +75,17 @@ class RefreshTokenResponse(BaseModel):
     error: Optional[str] = None
 
 
+def _get_basic_auth_header(settings: Settings) -> str:
+    """
+    產生 Pinterest API 所需的 Basic Auth header
+
+    Pinterest 使用 client_id:client_secret 的 Base64 編碼
+    """
+    credentials = f"{settings.PINTEREST_APP_ID}:{settings.PINTEREST_APP_SECRET}"
+    encoded = base64.b64encode(credentials.encode()).decode()
+    return f"Basic {encoded}"
+
+
 # API 端點
 @router.get("/auth", response_model=AuthUrlResponse)
 async def get_auth_url(
@@ -77,30 +94,30 @@ async def get_auth_url(
     settings: Settings = Depends(get_settings),
 ) -> AuthUrlResponse:
     """
-    產生 LinkedIn OAuth 授權 URL
+    產生 Pinterest OAuth 授權 URL
 
-    用戶需要訪問此 URL 進行 LinkedIn 帳號授權，
+    用戶需要訪問此 URL 進行 Pinterest 帳號授權，
     授權完成後會重定向到 redirect_uri。
     """
-    if not settings.LINKEDIN_CLIENT_ID:
+    if not settings.PINTEREST_APP_ID:
         raise HTTPException(
             status_code=500,
-            detail="LinkedIn Client ID not configured",
+            detail="Pinterest App ID not configured",
         )
 
     # 產生 state，包含 user_id 和 nonce 用於回調時識別用戶並防止 CSRF
-    state = await generate_oauth_state(current_user.id, "linkedin")
+    state = await generate_oauth_state(current_user.id, "pinterest")
 
     # 建構授權 URL 參數
     params = {
-        "response_type": "code",
-        "client_id": settings.LINKEDIN_CLIENT_ID,
+        "client_id": settings.PINTEREST_APP_ID,
         "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": ",".join(PINTEREST_SCOPES),
         "state": state,
-        "scope": " ".join(LINKEDIN_SCOPES),
     }
 
-    auth_url = f"{LINKEDIN_AUTH_URL}?{urlencode(params)}"
+    auth_url = f"{PINTEREST_AUTH_URL}?{urlencode(params)}"
 
     return AuthUrlResponse(auth_url=auth_url, state=state)
 
@@ -113,8 +130,10 @@ async def exchange_code_for_tokens(
     """
     使用授權碼交換 access token 和 refresh token
 
+    Pinterest 使用 Basic Auth + POST body 交換 token
+
     Args:
-        code: LinkedIn OAuth 授權碼
+        code: Pinterest OAuth 授權碼
         redirect_uri: OAuth 回調 URI
         settings: 應用程式設定
 
@@ -122,32 +141,31 @@ async def exchange_code_for_tokens(
         包含 token 資訊的字典
     """
     # Mock 模式
-    if is_mock_mode("linkedin"):
+    if is_mock_mode("pinterest"):
         return {
-            "access_token": f"mock_linkedin_access_{code[:8]}",
-            "refresh_token": f"mock_linkedin_refresh_{code[:8]}",
-            "expires_in": 5184000,  # 60 天
-            "scope": " ".join(LINKEDIN_SCOPES),
+            "access_token": f"mock_pinterest_access_{code[:8]}",
+            "refresh_token": f"mock_pinterest_refresh_{code[:8]}",
+            "expires_in": 2592000,  # 30 天
+            "scope": ",".join(PINTEREST_SCOPES),
         }
 
     # 真實 API 呼叫
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            LINKEDIN_TOKEN_URL,
+            PINTEREST_TOKEN_URL,
             data={
                 "grant_type": "authorization_code",
                 "code": code,
-                "client_id": settings.LINKEDIN_CLIENT_ID,
-                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
                 "redirect_uri": redirect_uri,
             },
             headers={
+                "Authorization": _get_basic_auth_header(settings),
                 "Content-Type": "application/x-www-form-urlencoded",
             },
         )
 
         if response.status_code != 200:
-            logger.error(f"LinkedIn token exchange failed: {response.text}")
+            logger.error(f"Pinterest token exchange failed: {response.text}")
             raise HTTPException(
                 status_code=400,
                 detail="Token exchange failed",
@@ -157,28 +175,28 @@ async def exchange_code_for_tokens(
         return {
             "access_token": data.get("access_token"),
             "refresh_token": data.get("refresh_token"),
-            "expires_in": data.get("expires_in", 5184000),
+            "expires_in": data.get("expires_in", 2592000),
             "scope": data.get("scope", ""),
         }
 
 
 @router.get("/callback", response_model=CallbackResponse)
 async def oauth_callback(
-    code: Optional[str] = Query(None, description="LinkedIn OAuth 授權碼"),
+    code: Optional[str] = Query(None, description="Pinterest OAuth 授權碼"),
     state: str = Query(..., description="CSRF 保護 state"),
     error: Optional[str] = Query(None, description="錯誤類型"),
     error_description: Optional[str] = Query(None, description="錯誤描述"),
     redirect_uri: str = Query(
-        "http://localhost:3000/api/v1/accounts/callback/linkedin",
+        "http://localhost:3000/api/v1/accounts/callback/pinterest",
         description="原始重定向 URI",
     ),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> CallbackResponse:
     """
-    處理 LinkedIn OAuth 回調
+    處理 Pinterest OAuth 回調
 
-    此端點由 LinkedIn OAuth 授權頁面重定向回來，
+    此端點由 Pinterest OAuth 授權頁面重定向回來，
     負責交換授權碼取得 access token 並儲存帳戶資訊。
     """
     try:
@@ -196,7 +214,7 @@ async def oauth_callback(
             )
 
         # 驗證 state 並取得 user_id
-        is_valid, user_id, error_msg = await verify_oauth_state(state, "linkedin")
+        is_valid, user_id, error_msg = await verify_oauth_state(state, "pinterest")
         if not is_valid or not user_id:
             return CallbackResponse(
                 success=False,
@@ -208,22 +226,22 @@ async def oauth_callback(
 
         # 使用 TokenManager 儲存帳戶到資料庫
         token_manager = TokenManager(db)
-        external_id = f"linkedin_user_{user_id.hex[:8]}"
+        external_id = f"pinterest_user_{user_id.hex[:8]}"
 
-        account_id, is_new, error = await token_manager.save_or_update_account(
+        account_id, is_new, save_error = await token_manager.save_or_update_account(
             user_id=user_id,
-            platform="linkedin",
+            platform="pinterest",
             external_id=external_id,
-            name=f"LinkedIn Ads - {external_id}",
+            name=f"Pinterest Ads - {external_id}",
             access_token=tokens["access_token"],
             refresh_token=tokens["refresh_token"],
             expires_in=tokens["expires_in"],
         )
 
-        if error:
+        if save_error:
             return CallbackResponse(
                 success=False,
-                error=error,
+                error=save_error,
             )
 
         return CallbackResponse(
@@ -234,7 +252,7 @@ async def oauth_callback(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"LinkedIn OAuth callback error: {e}")
+        logger.error(f"Pinterest OAuth callback error: {e}")
         return CallbackResponse(success=False, error=str(e))
 
 
@@ -246,38 +264,37 @@ async def refresh_access_token(
     使用 refresh token 取得新的 access token
 
     Args:
-        refresh_token: LinkedIn OAuth refresh token
+        refresh_token: Pinterest OAuth refresh token
         settings: 應用程式設定
 
     Returns:
         包含新 token 資訊的字典
     """
     # Mock 模式
-    if is_mock_mode("linkedin"):
+    if is_mock_mode("pinterest"):
         return {
-            "access_token": f"mock_linkedin_refreshed_{refresh_token[:8]}",
-            "refresh_token": f"mock_linkedin_new_refresh_{refresh_token[:8]}",
-            "expires_in": 5184000,  # 60 天
-            "scope": " ".join(LINKEDIN_SCOPES),
+            "access_token": f"mock_pinterest_refreshed_{refresh_token[:8]}",
+            "refresh_token": f"mock_pinterest_new_refresh_{refresh_token[:8]}",
+            "expires_in": 2592000,  # 30 天
+            "scope": ",".join(PINTEREST_SCOPES),
         }
 
     # 真實 API 呼叫
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            LINKEDIN_TOKEN_URL,
+            PINTEREST_TOKEN_URL,
             data={
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
-                "client_id": settings.LINKEDIN_CLIENT_ID,
-                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
             },
             headers={
+                "Authorization": _get_basic_auth_header(settings),
                 "Content-Type": "application/x-www-form-urlencoded",
             },
         )
 
         if response.status_code != 200:
-            logger.error(f"LinkedIn token refresh failed: {response.text}")
+            logger.error(f"Pinterest token refresh failed: {response.text}")
             raise HTTPException(
                 status_code=400,
                 detail="Token refresh failed",
@@ -287,7 +304,7 @@ async def refresh_access_token(
         return {
             "access_token": data.get("access_token"),
             "refresh_token": data.get("refresh_token", refresh_token),
-            "expires_in": data.get("expires_in", 5184000),
+            "expires_in": data.get("expires_in", 2592000),
             "scope": data.get("scope", ""),
         }
 
@@ -300,9 +317,9 @@ async def refresh_token_endpoint(
     settings: Settings = Depends(get_settings),
 ) -> RefreshTokenResponse:
     """
-    刷新 LinkedIn access token
+    刷新 Pinterest access token
 
-    LinkedIn token 有效期 60 天，此端點可用於提前刷新 token。
+    Pinterest token 有效期 30 天，此端點可用於提前刷新 token。
     """
     try:
         token_manager = TokenManager(db)
@@ -323,11 +340,11 @@ async def refresh_token_endpoint(
                 detail="You don't have permission to refresh this account's token",
             )
 
-        # 驗證是 LinkedIn 帳戶
-        if account.platform != "linkedin":
+        # 驗證是 Pinterest 帳戶
+        if account.platform != "pinterest":
             return RefreshTokenResponse(
                 success=False,
-                error="Account is not a LinkedIn account",
+                error="Account is not a Pinterest account",
             )
 
         # 刷新 token
@@ -349,5 +366,5 @@ async def refresh_token_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"LinkedIn token refresh error: {e}")
+        logger.error(f"Pinterest token refresh error: {e}")
         return RefreshTokenResponse(success=False, error=str(e))

@@ -15,6 +15,8 @@ APScheduler 定時任務管理
 - 每月 1 號 09:00：月報生成
 """
 
+from typing import Callable, Coroutine
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -25,179 +27,75 @@ logger = get_logger(__name__)
 scheduler = AsyncIOScheduler()
 
 
-async def meta_sync_job():
+def _create_platform_sync_job(
+    platform_name: str,
+    module_path: str,
+    get_accounts_fn: str,
+    sync_account_fn: str,
+) -> Callable[[], Coroutine]:
     """
-    Meta Ads API 數據同步（每 10 分鐘）
+    建立平台同步任務的工廠函數
 
-    從不穩定的 Celery Worker 遷移到 APScheduler，
-    確保同步任務隨 app process 穩定運行。
+    所有平台的同步任務邏輯相同：取得帳戶列表 -> 逐一同步 -> 記錄結果。
+    使用此工廠避免重複程式碼。
+
+    Args:
+        platform_name: 平台顯示名稱 (e.g., "Meta", "Google Ads")
+        module_path: worker 模組路徑 (e.g., "app.workers.sync_meta")
+        get_accounts_fn: 取得帳戶函數名稱 (e.g., "_get_meta_accounts")
+        sync_account_fn: 同步帳戶函數名稱 (e.g., "_sync_meta_account")
+
+    Returns:
+        async 同步任務函數
     """
-    from app.workers.sync_meta import _get_meta_accounts, _sync_meta_account
+    async def sync_job():
+        import importlib
+        module = importlib.import_module(module_path)
+        get_accounts = getattr(module, get_accounts_fn)
+        sync_account = getattr(module, sync_account_fn)
 
-    try:
-        accounts = await _get_meta_accounts()
-        logger.info(f"Meta sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_meta_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"Meta sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"Meta sync failed for account {account.id}: {e}")
-        logger.info(f"Meta sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"Meta sync dispatch failed: {e}")
+        try:
+            accounts = await get_accounts()
+            logger.info(f"{platform_name} sync: found {len(accounts)} accounts")
+            total_calls = 0
+            for account in accounts:
+                try:
+                    result = await sync_account(str(account.id))
+                    calls = result.get("api_calls", 0)
+                    total_calls += calls
+                    logger.info(
+                        f"{platform_name} sync completed for account {account.id}: "
+                        f"{calls} API calls, status={result.get('status')}"
+                    )
+                except Exception as e:
+                    logger.error(f"{platform_name} sync failed for account {account.id}: {e}")
+            logger.info(f"{platform_name} sync dispatch done: {total_calls} total API calls")
+        except Exception as e:
+            logger.error(f"{platform_name} sync dispatch failed: {e}")
 
-
-async def linkedin_sync_job():
-    """
-    LinkedIn Ads API 數據同步（每 15 分鐘）
-
-    同步 LinkedIn Advertising API 數據到統一模型。
-    使用 per-platform mock override（USE_MOCK_LINKEDIN_API）。
-    """
-    from app.workers.sync_linkedin import _get_linkedin_accounts, _sync_linkedin_account
-
-    try:
-        accounts = await _get_linkedin_accounts()
-        logger.info(f"LinkedIn sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_linkedin_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"LinkedIn sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"LinkedIn sync failed for account {account.id}: {e}")
-        logger.info(f"LinkedIn sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"LinkedIn sync dispatch failed: {e}")
+    sync_job.__doc__ = f"{platform_name} 數據同步任務"
+    return sync_job
 
 
-async def google_sync_job():
-    """
-    Google Ads API 數據同步（每 15 分鐘）
-
-    同步 Google Ads API 數據到統一模型。
-    使用 per-platform mock override（USE_MOCK_GOOGLE_ADS_API）。
-    """
-    from app.workers.sync_google import _get_google_accounts, _sync_google_account
-
-    try:
-        accounts = await _get_google_accounts()
-        logger.info(f"Google Ads sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_google_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"Google Ads sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"Google Ads sync failed for account {account.id}: {e}")
-        logger.info(f"Google Ads sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"Google Ads sync dispatch failed: {e}")
-
-
-async def pinterest_sync_job():
-    """
-    Pinterest Ads API 數據同步（每 15 分鐘）
-
-    同步 Pinterest Ads API v5 數據到統一模型。
-    使用 per-platform mock override（USE_MOCK_PINTEREST_API）。
-    """
-    from app.workers.sync_pinterest import _get_pinterest_accounts, _sync_pinterest_account
-
-    try:
-        accounts = await _get_pinterest_accounts()
-        logger.info(f"Pinterest sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_pinterest_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"Pinterest sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"Pinterest sync failed for account {account.id}: {e}")
-        logger.info(f"Pinterest sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"Pinterest sync dispatch failed: {e}")
-
-
-async def tiktok_sync_job():
-    """
-    TikTok Ads API 數據同步（每 15 分鐘）
-
-    同步 TikTok Marketing API 數據到統一模型。
-    使用 per-platform mock override（USE_MOCK_TIKTOK_API）。
-    """
-    from app.workers.sync_tiktok import _get_tiktok_accounts, _sync_tiktok_account
-
-    try:
-        accounts = await _get_tiktok_accounts()
-        logger.info(f"TikTok sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_tiktok_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"TikTok sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"TikTok sync failed for account {account.id}: {e}")
-        logger.info(f"TikTok sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"TikTok sync dispatch failed: {e}")
-
-
-async def reddit_sync_job():
-    """
-    Reddit Ads API 數據同步（每 15 分鐘）
-
-    同步 Reddit Ads API 數據到統一模型。
-    使用 per-platform mock override（USE_MOCK_REDDIT_API）。
-    """
-    from app.workers.sync_reddit import _get_reddit_accounts, _sync_reddit_account
-
-    try:
-        accounts = await _get_reddit_accounts()
-        logger.info(f"Reddit sync: found {len(accounts)} accounts")
-        total_calls = 0
-        for account in accounts:
-            try:
-                result = await _sync_reddit_account(str(account.id))
-                calls = result.get("api_calls", 0)
-                total_calls += calls
-                logger.info(
-                    f"Reddit sync completed for account {account.id}: "
-                    f"{calls} API calls, status={result.get('status')}"
-                )
-            except Exception as e:
-                logger.error(f"Reddit sync failed for account {account.id}: {e}")
-        logger.info(f"Reddit sync dispatch done: {total_calls} total API calls")
-    except Exception as e:
-        logger.error(f"Reddit sync dispatch failed: {e}")
-
+# 平台同步任務 - 使用工廠函數建立，避免 6 份幾乎相同的程式碼
+meta_sync_job = _create_platform_sync_job(
+    "Meta", "app.workers.sync_meta", "_get_meta_accounts", "_sync_meta_account",
+)
+google_sync_job = _create_platform_sync_job(
+    "Google Ads", "app.workers.sync_google", "_get_google_accounts", "_sync_google_account",
+)
+linkedin_sync_job = _create_platform_sync_job(
+    "LinkedIn", "app.workers.sync_linkedin", "_get_linkedin_accounts", "_sync_linkedin_account",
+)
+pinterest_sync_job = _create_platform_sync_job(
+    "Pinterest", "app.workers.sync_pinterest", "_get_pinterest_accounts", "_sync_pinterest_account",
+)
+tiktok_sync_job = _create_platform_sync_job(
+    "TikTok", "app.workers.sync_tiktok", "_get_tiktok_accounts", "_sync_tiktok_account",
+)
+reddit_sync_job = _create_platform_sync_job(
+    "Reddit", "app.workers.sync_reddit", "_get_reddit_accounts", "_sync_reddit_account",
+)
 
 
 async def autopilot_check_job():

@@ -8,7 +8,6 @@ Google Ads OAuth 路由
 3. 刷新 Token
 """
 
-from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import UUID
@@ -21,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings, Settings
 from app.core.logger import get_logger
 from app.db.base import get_db
-from app.middleware.auth import get_current_user, get_current_user_optional
+from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.services.csrf_protection import generate_oauth_state, verify_oauth_state
 from app.services.token_manager import TokenManager
@@ -108,20 +107,25 @@ async def exchange_code_for_tokens(
         return response.json()
 
 
-async def get_google_ads_customer_ids(access_token: str) -> list[str]:
+async def get_google_ads_customer_ids(
+    refresh_token: str,
+) -> list[str]:
     """
     取得使用者可存取的 Google Ads 客戶帳號 ID
 
+    使用 Google Ads API 的 CustomerService.listAccessibleCustomers。
+    需要 refresh_token（不是 access_token），因為 SDK 會自行處理 token 交換。
+
     Args:
-        access_token: OAuth access token
+        refresh_token: OAuth refresh token
 
     Returns:
         客戶帳號 ID 列表
     """
-    # 使用 Google Ads API 的 customerService.listAccessibleCustomers
-    # 這裡需要使用 google-ads SDK，先返回空列表
-    # TODO: 實作實際的 API 呼叫
-    return []
+    from app.services.google_ads import GoogleAdsAPIClient
+
+    client = GoogleAdsAPIClient(refresh_token=refresh_token)
+    return await client.list_accessible_customers()
 
 
 async def refresh_access_token(
@@ -157,10 +161,6 @@ async def refresh_access_token(
             )
 
         return response.json()
-
-
-# encode_state 和 decode_state 已移至 app.services.csrf_protection
-# 使用 generate_oauth_state 和 verify_oauth_state 替代
 
 
 # API 端點
@@ -243,8 +243,10 @@ async def oauth_callback(
                 error="No access token received",
             )
 
-        # 取得可存取的客戶帳號
-        customer_ids = await get_google_ads_customer_ids(access_token)
+        # 取得可存取的客戶帳號（需要 refresh_token）
+        customer_ids = []
+        if refresh_token:
+            customer_ids = await get_google_ads_customer_ids(refresh_token)
 
         # 使用 TokenManager 儲存帳戶到資料庫
         token_manager = TokenManager(db)

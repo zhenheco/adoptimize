@@ -6,18 +6,17 @@ primary_region = 'sin'  # 新加坡，離台灣近
 
 [build]
 
-# 定義多個進程
+# 定義進程（Meta sync 已遷移到 APScheduler，不再需要 Celery Worker）
 [processes]
   app = "uvicorn app.main:app --host 0.0.0.0 --port 8080"
-  worker = "celery -A app.workers.celery_app worker -B --loglevel=info"
 
 # HTTP 服務配置（僅適用於 app 進程）
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = 'stop'  # 第二台可在無流量時停機省成本
   auto_start_machines = true
-  min_machines_running = 1  # 保持至少 1 台 API 機器運行
+  min_machines_running = 1  # 至少 1 台永遠運行，確保 APScheduler 持續運作
   processes = ['app']
 
 # 健康檢查（僅適用於 app 進程）

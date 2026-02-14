@@ -551,6 +551,37 @@ class MetaAPIClient:
 
         return result
 
+    async def debug_token(self) -> dict[str, Any]:
+        """
+        驗證 access_token 有效性
+
+        使用 Meta debug_token endpoint，以 app token 呼叫，
+        不會增加 user token 的錯誤率。
+
+        Returns:
+            包含 is_valid, expires_at 等資訊的 dict
+        """
+        settings = get_settings()
+        app_token = f"{settings.META_APP_ID}|{settings.META_APP_SECRET}"
+        url = f"{self.BASE_URL}/debug_token"
+        params = {
+            "input_token": self.access_token,
+            "access_token": app_token,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(url, params=params)
+            result = response.json()
+
+        data = result.get("data", {})
+        is_valid = data.get("is_valid", False)
+        logger.info(
+            f"Token debug for {self.ad_account_id}: "
+            f"is_valid={is_valid}, "
+            f"expires_at={data.get('expires_at', 'N/A')}"
+        )
+        return data
+
     async def get_account_info(self) -> dict[str, Any]:
         """
         取得廣告帳戶基本資訊

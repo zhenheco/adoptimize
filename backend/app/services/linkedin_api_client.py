@@ -12,7 +12,6 @@ LinkedIn Marketing API 特點：
   - Linkedin-Version: yyyymm (年月格式)
 """
 
-import os
 import random
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -21,6 +20,7 @@ from uuid import uuid4
 import httpx
 
 from app.core.logger import get_logger
+from app.core.mock_mode import is_mock_mode
 
 logger = get_logger(__name__)
 
@@ -51,7 +51,7 @@ class LinkedInAPIClient:
         self.access_token = access_token
 
         if use_mock is None:
-            self.use_mock = os.getenv("USE_MOCK_ADS_API", "true").lower() == "true"
+            self.use_mock = is_mock_mode("linkedin")
         else:
             self.use_mock = use_mock
 

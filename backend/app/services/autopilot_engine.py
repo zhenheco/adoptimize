@@ -10,15 +10,13 @@
 """
 
 import logging
-from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import async_session_maker
+from app.db.base import async_session_maker
 from app.models.ad_account import AdAccount
 from app.models.autopilot_log import AutopilotLog
 

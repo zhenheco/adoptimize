@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Google Ads 數據同步 Worker
+LinkedIn Marketing API 數據同步 Worker
 
-負責從 Google Ads API 同步：
-- Campaigns（廣告活動 → campaigns 表）
-- Ad Groups（廣告群組 → ad_sets 表）
-- Ads（廣告 → ads 表）
+負責從 LinkedIn Marketing API 同步：
+- Campaign Groups（廣告組 → campaigns）
+- Campaigns（廣告活動 → ad_sets）
+- Creatives（素材）
 - Metrics（指標）
 
-Google Ads 階層對應到統一模型：
-- Campaign → Campaign (campaigns 表)
-- Ad Group → Ad Set (ad_sets 表)
-- Ad → Ad (ads 表)
+LinkedIn 階層對應到統一模型：
+- Campaign Group → Campaign (campaigns 表)
+- Campaign → Ad Set (ad_sets 表)
+- Creative → Ad (ads 表)
 """
 
 import logging
@@ -29,27 +29,27 @@ from app.models.ad_account import AdAccount
 from app.models.campaign import Campaign
 from app.models.ad_set import AdSet
 from app.models.ad import Ad
-from app.services.google_ads import GoogleAdsAPIClient
+from app.services.linkedin_api_client import LinkedInAPIClient
 
 logger = logging.getLogger(__name__)
 
 
-async def _get_google_accounts() -> list[AdAccount]:
-    """取得所有活躍的 Google Ads 帳戶"""
+async def _get_linkedin_accounts() -> list[AdAccount]:
+    """取得所有活躍的 LinkedIn Ads 帳戶"""
     worker_session_maker = create_worker_session_maker()
     async with worker_session_maker() as session:
         result = await session.execute(
             select(AdAccount).where(
-                AdAccount.platform == "google",
+                AdAccount.platform == "linkedin",
                 AdAccount.status == "active",
             )
         )
         return list(result.scalars().all())
 
 
-async def _sync_google_account(account_id: str) -> dict:
+async def _sync_linkedin_account(account_id: str) -> dict:
     """
-    執行 Google Ads 帳戶同步的核心邏輯
+    執行 LinkedIn Ads 帳戶同步的核心邏輯
 
     Args:
         account_id: 帳戶 UUID
@@ -57,8 +57,8 @@ async def _sync_google_account(account_id: str) -> dict:
     Returns:
         同步結果
     """
-    if is_mock_mode("google"):
-        logger.info(f"Google Ads sync skipped for {account_id}: Mock mode enabled")
+    if is_mock_mode("linkedin"):
+        logger.info(f"LinkedIn sync skipped for {account_id}: Mock mode enabled")
         return {"status": "skipped", "reason": "mock_mode"}
 
     worker_session_maker = create_worker_session_maker()
@@ -72,14 +72,13 @@ async def _sync_google_account(account_id: str) -> dict:
         if not account:
             return {"status": "error", "error": "Account not found"}
 
-        if not account.refresh_token or not account.refresh_token.strip():
-            logger.warning(f"Invalid refresh token for Google account {account_id}")
-            return {"status": "error", "error": "Invalid or empty refresh token"}
+        if not account.access_token or not account.access_token.strip():
+            logger.warning(f"Invalid token for LinkedIn account {account_id}")
+            return {"status": "error", "error": "Invalid or empty token"}
 
         # 2. 初始化 API Client（強制使用真實 API）
-        client = GoogleAdsAPIClient(
-            refresh_token=account.refresh_token,
-            customer_id=account.external_id,
+        client = LinkedInAPIClient(
+            access_token=account.access_token,
             use_mock=False,
         )
 
@@ -87,32 +86,32 @@ async def _sync_google_account(account_id: str) -> dict:
         total_api_calls = 0
 
         try:
-            # 3. 同步 Campaigns → campaigns 表
-            logger.info(f"Google Ads: syncing campaigns for {account_id}")
+            # 3. 同步 Campaign Groups → campaigns 表
+            logger.info(f"LinkedIn: syncing campaign groups for {account_id}")
+            groups_result = await _sync_campaign_groups(session, account, client)
+            sync_results["campaign_groups"] = groups_result
+            total_api_calls += 1
+
+            # 4. 同步 Campaigns → ad_sets 表
+            logger.info(f"LinkedIn: syncing campaigns for {account_id}")
             campaigns_result = await _sync_campaigns(session, account, client)
             sync_results["campaigns"] = campaigns_result
             total_api_calls += 1
 
-            # 4. 同步 Ad Groups → ad_sets 表
-            logger.info(f"Google Ads: syncing ad groups for {account_id}")
-            ad_groups_result = await _sync_ad_groups(session, account, client)
-            sync_results["ad_groups"] = ad_groups_result
-            total_api_calls += 1
-
-            # 5. 同步 Ads → ads 表
-            logger.info(f"Google Ads: syncing ads for {account_id}")
-            ads_result = await _sync_ads(session, account, client)
-            sync_results["ads"] = ads_result
+            # 5. 同步 Creatives → ads 表
+            logger.info(f"LinkedIn: syncing creatives for {account_id}")
+            creatives_result = await _sync_creatives(session, account, client)
+            sync_results["creatives"] = creatives_result
             total_api_calls += 1
 
             # 6. 同步 Metrics
-            logger.info(f"Google Ads: syncing metrics for {account_id}")
+            logger.info(f"LinkedIn: syncing metrics for {account_id}")
             metrics_result = await _sync_metrics(session, account, client)
             sync_results["metrics"] = metrics_result
             total_api_calls += 1
 
         except Exception as e:
-            logger.error(f"Google Ads sync error for {account_id}: {e}")
+            logger.error(f"LinkedIn sync error for {account_id}: {e}")
             sync_results["error"] = str(e)
 
         # 7. 更新 last_sync_at
@@ -124,7 +123,7 @@ async def _sync_google_account(account_id: str) -> dict:
         await session.commit()
 
         logger.info(
-            f"Google Ads sync completed for {account_id}: "
+            f"LinkedIn sync completed for {account_id}: "
             f"{total_api_calls} API calls"
         )
 
@@ -137,21 +136,26 @@ async def _sync_google_account(account_id: str) -> dict:
         }
 
 
-async def _sync_campaigns(
+async def _sync_campaign_groups(
     session: AsyncSession,
     account: AdAccount,
-    client: GoogleAdsAPIClient,
+    client: LinkedInAPIClient,
 ) -> dict[str, Any]:
     """
-    同步 Google Ads Campaigns → campaigns 表
+    同步 LinkedIn Campaign Groups → campaigns 表
+
+    LinkedIn Campaign Group = 我們的 Campaign
     """
     try:
-        campaigns = await client.get_campaigns()
-        logger.info(f"Fetched {len(campaigns)} campaigns from Google Ads")
+        # LinkedIn API 用帳戶的 external_id 查詢
+        # external_id 格式可能是 "linkedin_user_xxx" 或真正的 LinkedIn account ID
+        account_ext_id = account.external_id
+        groups = await client.get_campaign_groups(account_ext_id)
+        logger.info(f"Fetched {len(groups)} campaign groups from LinkedIn")
 
         synced_count = 0
-        for raw_campaign in campaigns:
-            external_id = str(raw_campaign.get("id", ""))
+        for raw_group in groups:
+            external_id = str(raw_group.get("id", ""))
             if not external_id:
                 continue
 
@@ -164,18 +168,19 @@ async def _sync_campaigns(
             )
             existing = result.scalar_one_or_none()
 
-            name = raw_campaign.get("name", f"Google Campaign {external_id}")
-            status = raw_campaign.get("status", "ENABLED")
+            name = raw_group.get("name", f"LinkedIn Group {external_id}")
+            status = raw_group.get("status", "ACTIVE")
+            budget_daily = None
+            budget_lifetime = None
 
-            # Google Ads budget 使用 micros（1 USD = 1,000,000 micros）
-            budget_micros = raw_campaign.get("budget_amount_micros", 0)
-            budget_daily = Decimal(str(budget_micros / 1_000_000)) if budget_micros else None
+            if raw_group.get("total_budget"):
+                budget_lifetime = Decimal(str(raw_group["total_budget"]))
 
             if existing:
                 existing.name = name
                 existing.status = status
-                if budget_daily is not None:
-                    existing.budget_daily = budget_daily
+                if budget_lifetime is not None:
+                    existing.budget_lifetime = budget_lifetime
                 existing.updated_at = datetime.now(timezone.utc)
             else:
                 campaign = Campaign(
@@ -185,6 +190,7 @@ async def _sync_campaigns(
                     name=name,
                     status=status,
                     budget_daily=budget_daily,
+                    budget_lifetime=budget_lifetime,
                 )
                 session.add(campaign)
 
@@ -194,26 +200,27 @@ async def _sync_campaigns(
         return {"status": "completed", "synced": synced_count}
 
     except Exception as e:
-        logger.error(f"Failed to sync campaigns: {e}")
+        logger.error(f"Failed to sync campaign groups: {e}")
         await session.rollback()
         return {"status": "error", "error": str(e)}
 
 
-async def _sync_ad_groups(
+async def _sync_campaigns(
     session: AsyncSession,
     account: AdAccount,
-    client: GoogleAdsAPIClient,
+    client: LinkedInAPIClient,
 ) -> dict[str, Any]:
     """
-    同步 Google Ads Ad Groups → ad_sets 表
+    同步 LinkedIn Campaigns → ad_sets 表
 
-    Google Ad Group = 我們的 Ad Set
+    LinkedIn Campaign = 我們的 Ad Set
     """
     try:
-        ad_groups = await client.get_ad_groups()
-        logger.info(f"Fetched {len(ad_groups)} ad groups from Google Ads")
+        account_ext_id = account.external_id
+        campaigns = await client.get_campaigns(account_ext_id)
+        logger.info(f"Fetched {len(campaigns)} campaigns from LinkedIn")
 
-        # 建立 Campaign external_id → Campaign.id 對應表
+        # 建立 Campaign Group external_id → Campaign.id 對應表
         campaigns_result = await session.execute(
             select(Campaign).where(Campaign.ad_account_id == account.id)
         )
@@ -224,13 +231,17 @@ async def _sync_ad_groups(
         synced_count = 0
         skipped_count = 0
 
-        for raw_group in ad_groups:
-            external_id = str(raw_group.get("id", ""))
+        for raw_campaign in campaigns:
+            external_id = str(raw_campaign.get("id", ""))
             if not external_id:
                 continue
 
-            campaign_ext_id = str(raw_group.get("campaign_id", ""))
-            campaign_id = campaign_map.get(campaign_ext_id)
+            # LinkedIn campaign 的 campaignGroup URN 對應到 Campaign Group
+            # 格式: urn:li:sponsoredCampaignGroup:12345
+            group_urn = raw_campaign.get("campaignGroup", "")
+            group_ext_id = group_urn.split(":")[-1] if ":" in str(group_urn) else ""
+
+            campaign_id = campaign_map.get(group_ext_id)
             if not campaign_id:
                 skipped_count += 1
                 continue
@@ -243,12 +254,12 @@ async def _sync_ad_groups(
             )
             existing = result.scalar_one_or_none()
 
-            name = raw_group.get("name", f"Google Ad Group {external_id}")
-            status = raw_group.get("status", "ENABLED")
+            name = raw_campaign.get("name", f"LinkedIn Campaign {external_id}")
+            status = raw_campaign.get("status", "ACTIVE")
+            budget_daily = None
 
-            # CPC bid 使用 micros
-            cpc_micros = raw_group.get("cpc_bid_micros", 0)
-            budget_daily = Decimal(str(cpc_micros / 1_000_000)) if cpc_micros else None
+            if raw_campaign.get("daily_budget"):
+                budget_daily = Decimal(str(raw_campaign["daily_budget"]))
 
             if existing:
                 existing.name = name
@@ -273,24 +284,27 @@ async def _sync_ad_groups(
         return {"status": "completed", "synced": synced_count, "skipped": skipped_count}
 
     except Exception as e:
-        logger.error(f"Failed to sync ad groups: {e}")
+        logger.error(f"Failed to sync campaigns: {e}")
         await session.rollback()
         return {"status": "error", "error": str(e)}
 
 
-async def _sync_ads(
+async def _sync_creatives(
     session: AsyncSession,
     account: AdAccount,
-    client: GoogleAdsAPIClient,
+    client: LinkedInAPIClient,
 ) -> dict[str, Any]:
     """
-    同步 Google Ads Ads → ads 表
+    同步 LinkedIn Creatives → ads 表
+
+    LinkedIn Creative = 我們的 Ad
     """
     try:
-        ads = await client.get_ads()
-        logger.info(f"Fetched {len(ads)} ads from Google Ads")
+        account_ext_id = account.external_id
+        creatives = await client.get_creatives(account_ext_id)
+        logger.info(f"Fetched {len(creatives)} creatives from LinkedIn")
 
-        # 建立 Ad Group external_id → AdSet.id 對應表
+        # 建立 LinkedIn Campaign external_id → AdSet.id 對應表
         campaigns_result = await session.execute(
             select(Campaign).where(Campaign.ad_account_id == account.id)
         )
@@ -306,13 +320,16 @@ async def _sync_ads(
         synced_count = 0
         skipped_count = 0
 
-        for raw_ad in ads:
-            external_id = str(raw_ad.get("id", ""))
+        for raw_creative in creatives:
+            external_id = str(raw_creative.get("id", ""))
             if not external_id:
                 continue
 
-            ad_group_ext_id = str(raw_ad.get("ad_group_id", ""))
-            adset_id = adset_map.get(ad_group_ext_id)
+            # Creative 的 campaign URN
+            campaign_urn = raw_creative.get("campaign_id", raw_creative.get("campaign", ""))
+            campaign_ext_id = str(campaign_urn).split(":")[-1] if ":" in str(campaign_urn) else str(campaign_urn)
+
+            adset_id = adset_map.get(campaign_ext_id)
             if not adset_id:
                 skipped_count += 1
                 continue
@@ -325,8 +342,8 @@ async def _sync_ads(
             )
             existing = result.scalar_one_or_none()
 
-            name = raw_ad.get("name", f"Google Ad {external_id}")
-            status = raw_ad.get("status", "ENABLED")
+            name = raw_creative.get("name", f"LinkedIn Creative {external_id}")
+            status = raw_creative.get("status", "ACTIVE")
 
             if existing:
                 existing.name = name
@@ -348,7 +365,7 @@ async def _sync_ads(
         return {"status": "completed", "synced": synced_count, "skipped": skipped_count}
 
     except Exception as e:
-        logger.error(f"Failed to sync ads: {e}")
+        logger.error(f"Failed to sync creatives: {e}")
         await session.rollback()
         return {"status": "error", "error": str(e)}
 
@@ -356,19 +373,20 @@ async def _sync_ads(
 async def _sync_metrics(
     session: AsyncSession,
     account: AdAccount,
-    client: GoogleAdsAPIClient,
+    client: LinkedInAPIClient,
 ) -> dict[str, Any]:
     """
-    同步 Google Ads 成效指標
+    同步 LinkedIn Ads 成效指標
 
-    取最近 7 天的數據
+    LinkedIn Development Tier 有 rate limit，所以只取最近 7 天
     """
     try:
+        account_ext_id = account.external_id
         end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         start_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
-        metrics = await client.get_metrics(start_date, end_date)
-        logger.info(f"Fetched {len(metrics)} metric records from Google Ads")
+        metrics = await client.get_metrics(account_ext_id, start_date, end_date)
+        logger.info(f"Fetched {len(metrics)} metric records from LinkedIn")
 
         return {"status": "completed", "metrics_count": len(metrics)}
 
