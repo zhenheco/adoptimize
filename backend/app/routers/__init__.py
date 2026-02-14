@@ -34,9 +34,9 @@ from app.routers import (
     history,
     notifications,
     oauth_google,
-    oauth_line,
     oauth_linkedin,
     oauth_meta,
+    oauth_pinterest,
     oauth_reddit,
     oauth_tiktok,
     recommendations,
@@ -176,13 +176,13 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    oauth_line.router,
-    prefix="/accounts/connect/line",
-    tags=["OAuth - LINE"],
-)
-
-api_router.include_router(
     oauth_linkedin.router,
     prefix="/accounts/connect/linkedin",
     tags=["OAuth - LinkedIn"],
+)
+
+api_router.include_router(
+    oauth_pinterest.router,
+    prefix="/accounts/connect/pinterest",
+    tags=["OAuth - Pinterest"],
 )

@@ -26,7 +26,7 @@ type AccountStatus = 'connected' | 'expired' | 'error';
  */
 interface AdAccount {
   id: string;
-  platform: 'google' | 'meta' | 'tiktok' | 'reddit' | 'line' | 'linkedin';
+  platform: 'google' | 'meta' | 'tiktok' | 'reddit' | 'linkedin' | 'pinterest';
   name: string;
   accountId: string;
   status: AccountStatus;
@@ -69,17 +69,17 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
       label: 'Reddit Ads',
       icon: 'R',
     },
-    line: {
-      bg: 'bg-green-500 dark:bg-green-600',
-      text: 'text-white dark:text-gray-100',
-      label: 'LINE Ads',
-      icon: 'L',
-    },
     linkedin: {
       bg: 'bg-blue-700 dark:bg-blue-800',
       text: 'text-white dark:text-gray-100',
       label: 'LinkedIn Ads',
       icon: 'in',
+    },
+    pinterest: {
+      bg: 'bg-red-600 dark:bg-red-700',
+      text: 'text-white dark:text-gray-100',
+      label: 'Pinterest Ads',
+      icon: 'P',
     },
   };
 
@@ -197,15 +197,6 @@ function AccountsContent() {
     message: string;
   } | null>(null);
 
-  // LINE 連接表單狀態
-  const [showLineForm, setShowLineForm] = useState(false);
-  const [lineCredentials, setLineCredentials] = useState({
-    accessKey: '',
-    secretKey: '',
-    adAccountId: '',
-  });
-  const [isConnectingLine, setIsConnectingLine] = useState(false);
-
   // 從 API 獲取帳戶列表
   useEffect(() => {
     async function fetchAccounts() {
@@ -226,7 +217,7 @@ function AccountsContent() {
             last_synced_at: string;
           }) => ({
             id: acc.id,
-            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit' | 'line' | 'linkedin',
+            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit' | 'linkedin' | 'pinterest',
             name: acc.name,
             accountId: acc.external_id,
             status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
@@ -255,8 +246,8 @@ function AccountsContent() {
         meta: 'Meta Ads',
         tiktok: 'TikTok Ads',
         reddit: 'Reddit Ads',
-        line: 'LINE Ads',
         linkedin: 'LinkedIn Ads',
+        pinterest: 'Pinterest Ads',
       };
       const platform = platformNames[success] || success;
       setToast({
@@ -435,54 +426,33 @@ function AccountsContent() {
   };
 
   /**
-   * 連結 LINE 帳戶（需要表單輸入）
+   * 連結 Pinterest 帳戶
    */
-  const handleConnectLine = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
-      return;
-    }
-
-    if (!lineCredentials.accessKey || !lineCredentials.secretKey || !lineCredentials.adAccountId) {
-      setToast({ type: 'error', message: '請填寫所有 LINE Ads 憑證欄位' });
-      return;
-    }
-
-    setIsConnectingLine(true);
+  const handleConnectPinterest = async () => {
     try {
-      const response = await fetch('/api/v1/accounts/connect/line', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_key: lineCredentials.accessKey,
-          secret_key: lineCredentials.secretKey,
-          ad_account_id: lineCredentials.adAccountId,
-        }),
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        return;
+      }
+      const response = await fetch('/api/v1/accounts/connect/pinterest', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setToast({ type: 'success', message: '成功連結 LINE Ads 帳戶' });
-        setShowLineForm(false);
-        setLineCredentials({ accessKey: '', secretKey: '', adAccountId: '' });
-        // 重新載入帳戶列表
-        window.location.reload();
+      if (response.ok) {
+        const data = await response.json();
+        if (data.auth_url) {
+          window.location.href = data.auth_url;
+        }
       } else {
-        setToast({
-          type: 'error',
-          message: data.error || '連接 LINE Ads 失敗',
-        });
+        const error = await response.json();
+        const errorMsg = typeof error.error === 'string'
+          ? error.error
+          : error.error?.message || '無法取得授權連結';
+        setToast({ type: 'error', message: errorMsg });
       }
     } catch (error) {
-      console.error('Connect LINE error:', error);
+      console.error('Connect Pinterest error:', error);
       setToast({ type: 'error', message: '連接失敗，請稍後再試' });
-    } finally {
-      setIsConnectingLine(false);
     }
   };
 
@@ -577,7 +547,7 @@ function AccountsContent() {
             <div>
               <CardTitle className="text-lg">連結新帳戶</CardTitle>
               <CardDescription>
-                連結您的 Google Ads、Meta、TikTok、Reddit 或 LinkedIn 廣告帳戶以開始優化
+                連結您的 Google Ads、Meta、TikTok、Reddit、LinkedIn 或 Pinterest 廣告帳戶以開始優化廣告投放
               </CardDescription>
             </div>
           </div>
@@ -609,14 +579,6 @@ function AccountsContent() {
               連結 Reddit Ads
             </Button>
             <Button
-              onClick={() => setShowLineForm(!showLineForm)}
-              variant="outline"
-              className="flex-1 min-w-[150px] bg-green-500 text-white hover:bg-green-600 border-green-500"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 LINE Ads
-            </Button>
-            <Button
               onClick={handleConnectLinkedIn}
               variant="outline"
               className="flex-1 min-w-[150px] bg-blue-700 text-white hover:bg-blue-800 border-blue-700"
@@ -624,81 +586,16 @@ function AccountsContent() {
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 LinkedIn Ads
             </Button>
+            <Button
+              onClick={handleConnectPinterest}
+              variant="outline"
+              className="flex-1 min-w-[150px] bg-red-600 text-white hover:bg-red-700 border-red-600"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              連結 Pinterest Ads
+            </Button>
           </div>
 
-          {/* LINE 連接表單 */}
-          {showLineForm && (
-            <div className="mt-6 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-              <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">
-                輸入 LINE Ads 憑證
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                請從 LINE Ads Platform 後台取得 Access Key 和 Secret Key
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Access Key
-                  </label>
-                  <input
-                    type="text"
-                    value={lineCredentials.accessKey}
-                    onChange={(e) =>
-                      setLineCredentials({ ...lineCredentials, accessKey: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="輸入 Access Key"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Secret Key
-                  </label>
-                  <input
-                    type="password"
-                    value={lineCredentials.secretKey}
-                    onChange={(e) =>
-                      setLineCredentials({ ...lineCredentials, secretKey: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="輸入 Secret Key"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    廣告帳號 ID
-                  </label>
-                  <input
-                    type="text"
-                    value={lineCredentials.adAccountId}
-                    onChange={(e) =>
-                      setLineCredentials({ ...lineCredentials, adAccountId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="輸入廣告帳號 ID"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleConnectLine}
-                    disabled={isConnectingLine}
-                    className="bg-green-500 hover:bg-green-600"
-                  >
-                    {isConnectingLine ? '連接中...' : '連接帳號'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowLineForm(false);
-                      setLineCredentials({ accessKey: '', secretKey: '', adAccountId: '' });
-                    }}
-                  >
-                    取消
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
