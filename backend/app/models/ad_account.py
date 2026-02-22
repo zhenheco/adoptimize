@@ -68,6 +68,8 @@ class AdAccount(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    currency: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="幣別")
+    timezone: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="時區")
 
     # 自動駕駛設定
     autopilot_enabled: Mapped[bool] = mapped_column(

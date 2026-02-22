@@ -30,6 +30,8 @@ interface BatchResponse {
  * @returns { success: boolean, affected: number, results: [...] }
  */
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
+
   try {
     const body: BatchRequest = await request.json();
 
@@ -78,7 +80,10 @@ export async function POST(request: NextRequest) {
     try {
       const pythonResponse = await fetch(`${pythonApiUrl}/api/v1/creatives/batch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
+        },
         body: JSON.stringify(body),
       });
 

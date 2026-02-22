@@ -14,13 +14,17 @@ interface ExecuteResponse {
  * 執行建議
  */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const { id } = await params
+  const authHeader = request.headers.get('Authorization')
 
   const response = await fetchBackend(`/api/v1/recommendations/${id}/execute`, {
     method: 'POST',
+    headers: {
+      ...(authHeader ? { 'Authorization': authHeader } : {}),
+    },
   })
 
   return handleBackendResponse<ExecuteResponse, object>(

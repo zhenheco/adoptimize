@@ -12,6 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const { id } = await params;
+  const authHeader = request.headers.get('Authorization');
 
   try {
     const response = await fetch(
@@ -20,6 +21,7 @@ export async function POST(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
       }
     );

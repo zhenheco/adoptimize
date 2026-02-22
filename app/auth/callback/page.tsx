@@ -17,20 +17,22 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // 從 URL 參數讀取 token
-        const params = new URLSearchParams(window.location.search)
-        const accessToken = params.get('access_token')
-        const userJson = params.get('user')
-        const errorParam = params.get('error')
+        // 透過 exchange 端點安全取得 token（token 儲存在 httpOnly cookie，非 URL）
+        const response = await fetch('/api/v1/auth/token-exchange', {
+          method: 'GET',
+          credentials: 'include', // 必須帶 cookie
+        })
 
-        // 處理錯誤情況
-        if (errorParam) {
-          setError(decodeURIComponent(errorParam))
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          setError(errData.error?.message || '未收到認證 token，請重新登入')
           setStatus('error')
           return
         }
 
-        // 檢查是否有 token
+        const result = await response.json()
+        const { access_token: accessToken, user } = result.data
+
         if (!accessToken) {
           setError('未收到認證 token，請重新登入')
           setStatus('error')
@@ -41,20 +43,11 @@ export default function AuthCallbackPage() {
         localStorage.setItem('access_token', accessToken)
 
         // 存入 user 資訊（如果有）
-        if (userJson) {
-          try {
-            const user = JSON.parse(decodeURIComponent(userJson))
-            localStorage.setItem('user', JSON.stringify(user))
-          } catch {
-            // 解析失敗時忽略，至少 token 已存
-            console.warn('無法解析 user 資訊')
-          }
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user))
         }
 
         setStatus('success')
-
-        // 清除 URL 中的 token（安全考量）並重定向到 dashboard
-        // 使用 replace 避免在瀏覽歷史中留下帶 token 的 URL
         router.replace('/dashboard')
       } catch (err) {
         console.error('處理 OAuth callback 時發生錯誤:', err)

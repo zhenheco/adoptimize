@@ -15,11 +15,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const searchParams = request.nextUrl.searchParams;
 
   try {
+    const authHeader = request.headers.get('Authorization');
     const response = await fetch(
       `${PYTHON_API_URL}/api/v1/accounts?${searchParams.toString()}`,
       {
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
       }
     );

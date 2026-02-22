@@ -6,33 +6,18 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8
  * GET /api/v1/suggestions/limit
  *
  * 檢查智慧建議使用限制（代理到 Python 後端）
- *
- * Query Parameters:
- * - user_id: 用戶 ID（必填）
+ * 認證：由 Authorization header 中的 JWT token 驗證
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const searchParams = request.nextUrl.searchParams;
-
-  // 驗證必填參數
-  const userId = searchParams.get('user_id');
-  if (!userId) {
-    return NextResponse.json(
-      {
-        error: {
-          code: 'MISSING_PARAM',
-          message: 'user_id is required',
-        },
-      },
-      { status: 400 }
-    );
-  }
+  const authHeader = request.headers.get('Authorization');
 
   try {
     const response = await fetch(
-      `${PYTHON_API_URL}/api/v1/suggestions/limit?${searchParams.toString()}`,
+      `${PYTHON_API_URL}/api/v1/suggestions/limit`,
       {
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
         },
       }
     );

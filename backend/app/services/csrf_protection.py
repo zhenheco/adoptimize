@@ -10,7 +10,7 @@ import base64
 import json
 import secrets
 import uuid
-from typing import Optional, Tuple
+from typing import Optional
 
 from app.core.logger import get_logger
 from app.services.redis_client import get_redis_client
@@ -57,7 +57,7 @@ async def generate_oauth_state(user_id: uuid.UUID, provider: str) -> str:
     return base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
 
 
-async def verify_oauth_state(state: str, provider: str) -> Tuple[bool, Optional[uuid.UUID], Optional[str]]:
+async def verify_oauth_state(state: str, provider: str) -> tuple[bool, Optional[uuid.UUID], Optional[str]]:
     """
     驗證 OAuth state 參數
 
@@ -111,9 +111,8 @@ async def verify_oauth_state(state: str, provider: str) -> Tuple[bool, Optional[
 
         except Exception as e:
             logger.error(f"Redis error during nonce verification: {e}")
-            # Redis 失敗時降級到只驗證格式
-            logger.warning("Falling back to format-only validation due to Redis error")
-            return True, uuid.UUID(user_id_str), None
+            # Redis 失敗時必須拒絕，不可降級通過（CSRF 防護）
+            return False, None, "State verification unavailable - please try again"
 
     except (json.JSONDecodeError, ValueError, TypeError) as e:
         logger.error(f"Failed to decode OAuth state: {e}")

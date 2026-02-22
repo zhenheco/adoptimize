@@ -12,6 +12,7 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const searchParams = request.nextUrl.searchParams;
+  const authHeader = request.headers.get('Authorization');
 
   try {
     const response = await fetch(
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       {
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
       }
     );
@@ -58,6 +60,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * 觸發新的健檢（代理到 Python 後端）
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authHeader = request.headers.get('Authorization');
+
   try {
     const body = await request.json();
 
@@ -65,6 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(authHeader ? { 'Authorization': authHeader } : {}),
       },
       body: JSON.stringify(body),
     });

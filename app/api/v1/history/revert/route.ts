@@ -22,6 +22,7 @@ interface RevertResponse {
  * 還原操作
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authHeader = request.headers.get('Authorization')
   const body = (await request.json()) as RevertRequest
   const { id } = body
 
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const response = await fetchBackend(`/api/v1/history/${id}/revert`, {
     method: 'POST',
+    headers: {
+      ...(authHeader ? { 'Authorization': authHeader } : {}),
+    },
   })
 
   return handleBackendResponse<RevertResponse, object>(

@@ -78,15 +78,17 @@ class User(Base):
         nullable=True,
         comment="一鍵執行次數重置日期",
     )
-    # 移除 monthly_suggestion_count 和 suggestion_count_reset_at
-    # 這些欄位資料庫中不存在，改用 property 提供預設值
-    @property
-    def monthly_suggestion_count(self) -> int:
-        return 0
-
-    @property
-    def suggestion_count_reset_at(self) -> date:
-        return date.today()
+    monthly_suggestion_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="本月建議生成次數",
+    )
+    suggestion_count_reset_at: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+        comment="建議次數重置日期",
+    )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean,

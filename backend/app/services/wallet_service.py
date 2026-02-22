@@ -139,8 +139,14 @@ class WalletService:
         if amount <= 0:
             raise ValueError("扣款金額必須為正數")
 
-        # 取得錢包
-        wallet = await WalletService.get_or_create_wallet(db, user_id)
+        # 使用 FOR UPDATE 鎖定錢包，防止並發扣款競態條件
+        result = await db.execute(
+            select(Wallet).where(Wallet.user_id == user_id).with_for_update()
+        )
+        wallet = result.scalar_one_or_none()
+
+        if wallet is None:
+            raise ValueError("用戶沒有錢包，無法扣款")
 
         # 檢查餘額
         if wallet.balance < amount:

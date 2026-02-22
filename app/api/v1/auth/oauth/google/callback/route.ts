@@ -12,7 +12,23 @@ export const dynamic = 'force-dynamic';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
-export async function GET(request: NextRequest) {
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/** 共用的安全 cookie 選項 */
+const SECURE_COOKIE_BASE = {
+  httpOnly: true,
+  secure: IS_PRODUCTION,
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
+function redirectToLogin(request: NextRequest, errorMessage: string): NextResponse {
+  return NextResponse.redirect(
+    new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
+  );
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
@@ -22,16 +38,11 @@ export async function GET(request: NextRequest) {
     // 處理 OAuth 錯誤
     if (error) {
       const errorDescription = searchParams.get('error_description') || 'Unknown error';
-      // 重定向到登入頁面並帶上錯誤訊息
-      return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(errorDescription)}`, request.url)
-      );
+      return redirectToLogin(request, errorDescription);
     }
 
     if (!code) {
-      return NextResponse.redirect(
-        new URL('/auth/login?error=No authorization code received', request.url)
-      );
+      return redirectToLogin(request, 'No authorization code received');
     }
 
     // 構建回調 URL 參數
@@ -54,39 +65,34 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok || !data.success) {
       const errorMessage = data.error || data.detail || 'OAuth callback failed';
-      return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
-      );
+      return redirectToLogin(request, errorMessage);
     }
 
-    // 成功後重定向到 callback 中間頁面，帶上 token
-    // 這樣前端才能將 token 存入 localStorage
-    const callbackUrl = new URL('/auth/callback', request.url);
-    callbackUrl.searchParams.set('access_token', data.data.access_token);
+    // 成功後將 token 資料暫存至短效 httpOnly cookie（60秒），不放入 URL
+    // /auth/callback 頁面會透過 /api/v1/auth/token-exchange 安全取得 token
+    const res = NextResponse.redirect(new URL('/auth/callback', request.url));
 
-    // 如果有 user 資訊，也傳遞給前端
-    if (data.data.user) {
-      callbackUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(data.data.user)));
-    }
-
-    const res = NextResponse.redirect(callbackUrl);
+    // 暫存 access_token（60秒後自動過期）
+    const tempPayload = JSON.stringify({
+      access_token: data.data.access_token,
+      user: data.data.user || null,
+    });
+    res.cookies.set('oauth_token_temp', tempPayload, {
+      ...SECURE_COOKIE_BASE,
+      maxAge: 60, // 60 秒，前端取得後立即清除
+    });
 
     // 設置 httpOnly cookie 存儲 refresh token（用於 token 刷新）
     if (data.data?.refresh_token) {
       res.cookies.set('refresh_token', data.data.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        ...SECURE_COOKIE_BASE,
         maxAge: 7 * 24 * 60 * 60, // 7 天
-        path: '/',
       });
     }
 
     return res;
-  } catch (error) {
-    console.error('Google OAuth callback error:', error);
-    return NextResponse.redirect(
-      new URL('/auth/login?error=Internal server error', request.url)
-    );
+  } catch (err) {
+    console.error('Google OAuth callback error:', err);
+    return redirectToLogin(request, 'Internal server error');
   }
 }

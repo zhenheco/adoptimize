@@ -19,7 +19,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
+from app.middleware.auth import get_current_user
 from app.models import AdAccount
+from app.models.user import User
 
 router = APIRouter()
 
@@ -61,6 +63,30 @@ class AccountSyncResponse(BaseModel):
     message: str
 
 
+def _parse_account_uuid(account_id: str) -> uuid.UUID:
+    """驗證並解析帳戶 ID 格式，失敗時拋出 400 HTTPException"""
+    try:
+        return uuid.UUID(account_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid account ID format")
+
+
+async def _get_user_account(
+    db: AsyncSession, account_uuid: uuid.UUID, user_id: uuid.UUID
+) -> AdAccount:
+    """取得用戶帳戶，不存在時拋出 404 HTTPException"""
+    result = await db.execute(
+        select(AdAccount).where(
+            AdAccount.id == account_uuid,
+            AdAccount.user_id == user_id,
+        )
+    )
+    account = result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return account
+
+
 def _convert_db_account_to_response(account: AdAccount) -> AccountResponse:
     """將資料庫記錄轉換為 API 回應格式"""
     return AccountResponse(
@@ -79,6 +105,7 @@ async def get_accounts(
     platform: Optional[str] = Query(None, description="平台: google, meta"),
     status: Optional[str] = Query(None, description="狀態: active, paused, removed"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AccountListResponse:
     """
     取得帳戶列表
@@ -93,8 +120,8 @@ async def get_accounts(
     Returns:
         AccountListResponse: 帳戶列表
     """
-    # 建立查詢
-    query = select(AdAccount)
+    # 建立查詢（只返回當前用戶的帳戶）
+    query = select(AdAccount).where(AdAccount.user_id == current_user.id)
 
     # 預設排除已移除的帳戶
     if status:
@@ -127,6 +154,7 @@ async def get_accounts(
 async def get_account(
     account_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AccountResponse:
     """
     取得帳戶詳情
@@ -138,21 +166,8 @@ async def get_account(
     Returns:
         AccountResponse: 帳戶詳情
     """
-    # 驗證 ID 格式
-    try:
-        account_uuid = uuid.UUID(account_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid account ID format")
-
-    # 從資料庫取得帳戶
-    result = await db.execute(
-        select(AdAccount).where(AdAccount.id == account_uuid)
-    )
-    account_record = result.scalar_one_or_none()
-
-    if not account_record:
-        raise HTTPException(status_code=404, detail="Account not found")
-
+    account_uuid = _parse_account_uuid(account_id)
+    account_record = await _get_user_account(db, account_uuid, current_user.id)
     return _convert_db_account_to_response(account_record)
 
 
@@ -160,6 +175,7 @@ async def get_account(
 async def delete_account(
     account_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AccountDeleteResponse:
     """
     斷開帳戶連接
@@ -173,25 +189,8 @@ async def delete_account(
     Returns:
         AccountDeleteResponse: 刪除結果
     """
-    # 驗證 ID 格式
-    try:
-        account_uuid = uuid.UUID(account_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid account ID format")
-
-    # 從資料庫取得帳戶
-    result = await db.execute(
-        select(AdAccount).where(AdAccount.id == account_uuid)
-    )
-    account_record = result.scalar_one_or_none()
-
-    if not account_record:
-        # 模擬模式
-        return AccountDeleteResponse(
-            success=True,
-            account_id=account_id,
-            message="帳戶已斷開連接 (simulated)",
-        )
+    account_uuid = _parse_account_uuid(account_id)
+    account_record = await _get_user_account(db, account_uuid, current_user.id)
 
     # 軟刪除：更新狀態
     account_record.status = "removed"
@@ -211,6 +210,7 @@ async def delete_account(
 async def sync_account(
     account_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AccountSyncResponse:
     """
     手動觸發帳戶同步
@@ -224,15 +224,14 @@ async def sync_account(
     Returns:
         AccountSyncResponse: 同步任務資訊
     """
-    # 驗證 ID 格式
-    try:
-        account_uuid = uuid.UUID(account_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid account ID format")
+    account_uuid = _parse_account_uuid(account_id)
 
-    # 從資料庫取得帳戶
+    # 從資料庫取得帳戶（同時驗證所有權）
     result = await db.execute(
-        select(AdAccount).where(AdAccount.id == account_uuid)
+        select(AdAccount).where(
+            AdAccount.id == account_uuid,
+            AdAccount.user_id == current_user.id,
+        )
     )
     account_record = result.scalar_one_or_none()
 

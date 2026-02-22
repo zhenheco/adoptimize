@@ -25,6 +25,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const { id } = await params
+  const authHeader = request.headers.get('Authorization')
   const body = (await request.json()) as SnoozeRequest
   const { snooze_until } = body
 
@@ -34,6 +35,9 @@ export async function POST(
 
   const response = await fetchBackend(`/api/v1/recommendations/${id}/snooze`, {
     method: 'POST',
+    headers: {
+      ...(authHeader ? { 'Authorization': authHeader } : {}),
+    },
     body: JSON.stringify({ snooze_until }),
   })
 

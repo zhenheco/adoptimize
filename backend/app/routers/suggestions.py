@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
+from app.middleware.auth import get_current_user
 from app.models import (
     AdAccount,
     AudienceSuggestion,
@@ -377,38 +378,24 @@ async def get_options() -> OptionsResponse:
 
 @router.get("/limit", response_model=SuggestionLimitResponse)
 async def get_suggestion_limit(
-    user_id: str = Query(..., description="用戶 ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SuggestionLimitResponse:
     """
     檢查智慧建議使用限制
 
     Args:
-        user_id: 用戶 ID
         db: 資料庫 session
 
     Returns:
         SuggestionLimitResponse: 使用限制資訊
     """
-    # 驗證用戶 ID
-    try:
-        user_uuid = uuid.UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-
-    # 取得用戶資訊
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # 檢查限制
-    tier = get_tier_from_string(user.subscription_tier)
+    tier = get_tier_from_string(current_user.subscription_tier)
     limit_result = check_suggestion_limit(
         tier,
-        user.monthly_suggestion_count,
-        user.suggestion_count_reset_at,
+        current_user.monthly_suggestion_count,
+        current_user.suggestion_count_reset_at,
     )
 
     return SuggestionLimitResponse(
@@ -425,9 +412,9 @@ async def get_suggestion_limit(
 @router.post("/generate", response_model=SuggestionResponse)
 async def generate_suggestion(
     request: GenerateSuggestionRequest,
-    user_id: str = Query(..., description="用戶 ID"),
     use_mock: bool = Query(False, description="是否使用模擬模式（不呼叫 AI API）"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SuggestionResponse:
     """
     生成 AI 受眾建議
@@ -436,7 +423,6 @@ async def generate_suggestion(
 
     Args:
         request: 生成建議請求
-        user_id: 用戶 ID
         use_mock: 是否使用模擬模式
         db: 資料庫 session
 
@@ -445,33 +431,20 @@ async def generate_suggestion(
 
     Raises:
         HTTPException: 429 - 超過使用限制
-        HTTPException: 404 - 用戶或帳戶不存在
+        HTTPException: 404 - 帳戶不存在
     """
-    # 驗證用戶 ID
-    try:
-        user_uuid = uuid.UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-
     # 驗證帳戶 ID
     try:
         account_uuid = uuid.UUID(request.account_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid account ID format")
 
-    # 取得用戶資訊
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # 檢查使用限制
-    tier = get_tier_from_string(user.subscription_tier)
+    tier = get_tier_from_string(current_user.subscription_tier)
     limit_result = check_suggestion_limit(
         tier,
-        user.monthly_suggestion_count,
-        user.suggestion_count_reset_at,
+        current_user.monthly_suggestion_count,
+        current_user.suggestion_count_reset_at,
     )
 
     if not limit_result.can_generate:
@@ -485,8 +458,13 @@ async def generate_suggestion(
             },
         )
 
-    # 取得廣告帳戶
-    result = await db.execute(select(AdAccount).where(AdAccount.id == account_uuid))
+    # 取得廣告帳戶（同時驗證所有權）
+    result = await db.execute(
+        select(AdAccount).where(
+            AdAccount.id == account_uuid,
+            AdAccount.user_id == current_user.id,
+        )
+    )
     account = result.scalar_one_or_none()
 
     if not account:
@@ -569,7 +547,7 @@ async def generate_suggestion(
     # 建立資料庫記錄
     suggestion = AudienceSuggestion(
         id=uuid.uuid4(),
-        user_id=user_uuid,
+        user_id=current_user.id,
         account_id=account_uuid,
         industry_code=request.industry_code,
         objective_code=request.objective_code,
@@ -593,32 +571,31 @@ async def generate_suggestion(
 
     # 遞增用戶建議生成次數
     new_count, new_reset_date = increment_suggestion_count(
-        user.monthly_suggestion_count,
-        user.suggestion_count_reset_at,
+        current_user.monthly_suggestion_count,
+        current_user.suggestion_count_reset_at,
     )
-    user.monthly_suggestion_count = new_count
-    user.suggestion_count_reset_at = new_reset_date
+    current_user.monthly_suggestion_count = new_count
+    current_user.suggestion_count_reset_at = new_reset_date
 
     await db.flush()
 
     # 轉換為回應格式（根據訂閱層級過濾）
-    return _convert_db_suggestion_to_response(suggestion, user.subscription_tier)
+    return _convert_db_suggestion_to_response(suggestion, current_user.subscription_tier)
 
 
 @router.get("", response_model=SuggestionListResponse)
 async def get_suggestions(
-    user_id: str = Query(..., description="用戶 ID"),
     account_id: Optional[str] = Query(None, description="帳戶 ID（選填）"),
     status: Optional[str] = Query(None, description="狀態篩選"),
     page: int = Query(1, ge=1, description="頁碼"),
     page_size: int = Query(20, ge=1, le=50, description="每頁筆數"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SuggestionListResponse:
     """
     取得建議歷史列表
 
     Args:
-        user_id: 用戶 ID
         account_id: 帳戶 ID（選填）
         status: 狀態篩選
         page: 頁碼
@@ -628,21 +605,8 @@ async def get_suggestions(
     Returns:
         SuggestionListResponse: 建議列表
     """
-    # 驗證用戶 ID
-    try:
-        user_uuid = uuid.UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-
-    # 取得用戶資訊（用於訂閱層級）
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # 建立查詢
-    query = select(AudienceSuggestion).where(AudienceSuggestion.user_id == user_uuid)
+    query = select(AudienceSuggestion).where(AudienceSuggestion.user_id == current_user.id)
 
     # 帳戶篩選
     if account_id:
@@ -665,7 +629,7 @@ async def get_suggestions(
 
     # 轉換為回應格式
     all_suggestions = [
-        _convert_db_suggestion_to_response(s, user.subscription_tier) for s in suggestions
+        _convert_db_suggestion_to_response(s, current_user.subscription_tier) for s in suggestions
     ]
 
     # 分頁
@@ -688,15 +652,14 @@ async def get_suggestions(
 @router.get("/{suggestion_id}", response_model=SuggestionResponse)
 async def get_suggestion(
     suggestion_id: str,
-    user_id: str = Query(..., description="用戶 ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SuggestionResponse:
     """
     取得建議詳情
 
     Args:
         suggestion_id: 建議 ID
-        user_id: 用戶 ID
         db: 資料庫 session
 
     Returns:
@@ -705,22 +668,14 @@ async def get_suggestion(
     # 驗證 ID
     try:
         suggestion_uuid = uuid.UUID(suggestion_id)
-        user_uuid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid ID format")
-
-    # 取得用戶資訊
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
 
     # 取得建議
     result = await db.execute(
         select(AudienceSuggestion).where(
             AudienceSuggestion.id == suggestion_uuid,
-            AudienceSuggestion.user_id == user_uuid,
+            AudienceSuggestion.user_id == current_user.id,
         )
     )
     suggestion = result.scalar_one_or_none()
@@ -728,15 +683,15 @@ async def get_suggestion(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
 
-    return _convert_db_suggestion_to_response(suggestion, user.subscription_tier)
+    return _convert_db_suggestion_to_response(suggestion, current_user.subscription_tier)
 
 
 @router.post("/{suggestion_id}/save-audience", response_model=SaveAudienceResponse)
 async def save_audience(
     suggestion_id: str,
     request: SaveAudienceRequest,
-    user_id: str = Query(..., description="用戶 ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SaveAudienceResponse:
     """
     根據建議建立 Meta 自訂受眾
@@ -746,7 +701,6 @@ async def save_audience(
     Args:
         suggestion_id: 建議 ID
         request: 建立受眾請求
-        user_id: 用戶 ID
         db: 資料庫 session
 
     Returns:
@@ -755,20 +709,12 @@ async def save_audience(
     # 驗證 ID
     try:
         suggestion_uuid = uuid.UUID(suggestion_id)
-        user_uuid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
-    # 取得用戶資訊
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # 檢查權限
     can_execute, message = can_execute_suggestion_action(
-        user.subscription_tier, "create_audience"
+        current_user.subscription_tier, "create_audience"
     )
 
     if not can_execute:
@@ -778,7 +724,7 @@ async def save_audience(
     result = await db.execute(
         select(AudienceSuggestion).where(
             AudienceSuggestion.id == suggestion_uuid,
-            AudienceSuggestion.user_id == user_uuid,
+            AudienceSuggestion.user_id == current_user.id,
         )
     )
     suggestion = result.scalar_one_or_none()
@@ -811,8 +757,8 @@ async def save_audience(
 async def create_ad(
     suggestion_id: str,
     request: CreateAdRequest,
-    user_id: str = Query(..., description="用戶 ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CreateAdResponse:
     """
     根據建議建立完整廣告（Ad Set + Ad）
@@ -822,7 +768,6 @@ async def create_ad(
     Args:
         suggestion_id: 建議 ID
         request: 建立廣告請求
-        user_id: 用戶 ID
         db: 資料庫 session
 
     Returns:
@@ -831,20 +776,12 @@ async def create_ad(
     # 驗證 ID
     try:
         suggestion_uuid = uuid.UUID(suggestion_id)
-        user_uuid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
-    # 取得用戶資訊
-    result = await db.execute(select(User).where(User.id == user_uuid))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # 檢查權限
     can_execute, message = can_execute_suggestion_action(
-        user.subscription_tier, "create_ad"
+        current_user.subscription_tier, "create_ad"
     )
 
     if not can_execute:
@@ -854,7 +791,7 @@ async def create_ad(
     result = await db.execute(
         select(AudienceSuggestion).where(
             AudienceSuggestion.id == suggestion_uuid,
-            AudienceSuggestion.user_id == user_uuid,
+            AudienceSuggestion.user_id == current_user.id,
         )
     )
     suggestion = result.scalar_one_or_none()

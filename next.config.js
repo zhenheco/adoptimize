@@ -5,9 +5,9 @@ const nextConfig = {
   // OpenNext.js 必要設定
   output: 'standalone',
 
-  // 設定 Python 後端 API URL (使用 NEXT_PUBLIC_ 前綴以便 build-time 嵌入)
+  // 設定 Python 後端 API URL（僅供伺服器端使用，不應曝露給客戶端）
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
     return [
       {
         source: '/api/python/:path*',

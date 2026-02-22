@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000';
 
@@ -7,7 +7,9 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8
  *
  * 標記所有通知為已讀（代理到 Python 後端）
  */
-export async function PUT(): Promise<NextResponse> {
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const authHeader = request.headers.get('Authorization');
+
   try {
     const response = await fetch(
       `${PYTHON_API_URL}/api/v1/notifications/read-all`,
@@ -15,6 +17,7 @@ export async function PUT(): Promise<NextResponse> {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
       }
     );

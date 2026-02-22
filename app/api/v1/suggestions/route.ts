@@ -16,6 +16,7 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const searchParams = request.nextUrl.searchParams;
+  const authHeader = request.headers.get('Authorization');
 
   // 驗證必填參數
   const userId = searchParams.get('user_id');
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       {
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
       }
     );
@@ -87,6 +89,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const searchParams = request.nextUrl.searchParams;
+  const authHeader = request.headers.get('Authorization');
 
   // 驗證必填參數
   const userId = searchParams.get('user_id');
@@ -124,6 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
         },
         body: JSON.stringify(body),
       }

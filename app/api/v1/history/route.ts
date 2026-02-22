@@ -10,13 +10,18 @@ const PYTHON_API = process.env.PYTHON_API_URL?.trim() || 'http://localhost:8000'
  * 支援篩選和搜尋
  */
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
+
   try {
     const { searchParams } = new URL(request.url);
 
     // 嘗試從 Python 後端獲取資料
     try {
       const response = await fetch(`${PYTHON_API}/api/v1/history?${searchParams}`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { 'Authorization': authHeader } : {}),
+        },
       });
 
       if (response.ok) {
