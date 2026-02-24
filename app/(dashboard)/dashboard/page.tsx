@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
 import { AutopilotStatus } from '@/components/dashboard/autopilot-status';
 import { AIActionsList } from '@/components/dashboard/ai-actions-list';
 import { PendingDecisions } from '@/components/dashboard/pending-decisions';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
-// Mock data - 之後會從 API 取得
+// Mock data - API 失敗時的預設資料
 const mockAutopilot = {
   enabled: true,
   targetCpa: 500,
@@ -63,11 +64,72 @@ const mockDecisions = [
  * - 待決定事項
  */
 export default function DashboardPage() {
+  const [autopilot, setAutopilot] = useState(mockAutopilot);
+  const [actions, setActions] = useState(mockActions);
   const [decisions, setDecisions] = useState(mockDecisions);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-  const handleDecide = (decisionId: string, value: string) => {
-    // TODO: 呼叫 API 處理決策
-    console.log('Decision:', decisionId, value);
+  // 從 API 載入資料，失敗時使用 mock data
+  useEffect(() => {
+    async function fetchDashboardData() {
+      let usingMock = false;
+
+      try {
+        const [autopilotRes, actionsRes, decisionsRes] = await Promise.all([
+          fetchWithAuth('/api/v1/autopilot/status').catch(() => null),
+          fetchWithAuth('/api/v1/autopilot/actions').catch(() => null),
+          fetchWithAuth('/api/v1/autopilot/decisions').catch(() => null),
+        ]);
+
+        if (autopilotRes?.ok) {
+          const data = await autopilotRes.json();
+          setAutopilot(data);
+        } else {
+          usingMock = true;
+        }
+
+        if (actionsRes?.ok) {
+          const data = await actionsRes.json();
+          if (data.length > 0) {
+            setActions(data);
+          } else {
+            usingMock = true;
+          }
+        } else {
+          usingMock = true;
+        }
+
+        if (decisionsRes?.ok) {
+          const data = await decisionsRes.json();
+          setDecisions(data);
+        } else {
+          usingMock = true;
+        }
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        usingMock = true;
+      }
+
+      setIsUsingMockData(usingMock);
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  const handleDecide = async (decisionId: string, value: string) => {
+    try {
+      const res = await fetchWithAuth('/api/v1/autopilot/decisions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision_id: decisionId, value }),
+      });
+      if (!res.ok) {
+        console.warn('Decision API failed, removing locally');
+      }
+    } catch (err) {
+      console.warn('Decision API unavailable:', err);
+    }
+    // 無論 API 成功與否，都從 UI 移除
     setDecisions((prev) => prev.filter((d) => d.id !== decisionId));
   };
 
@@ -87,8 +149,15 @@ export default function DashboardPage() {
         </span>
       </div>
 
+      {/* 使用展示資料提示 */}
+      {isUsingMockData && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          目前顯示的是展示資料。連接廣告帳號後將顯示真實數據。
+        </div>
+      )}
+
       {/* 自動駕駛狀態 */}
-      <AutopilotStatus {...mockAutopilot} />
+      <AutopilotStatus {...autopilot} />
 
       {/* 本月指標 */}
       <div>
@@ -99,7 +168,7 @@ export default function DashboardPage() {
       </div>
 
       {/* AI 執行記錄 */}
-      <AIActionsList actions={mockActions} />
+      <AIActionsList actions={actions} />
 
       {/* 待決定事項 */}
       <PendingDecisions decisions={decisions} onDecide={handleDecide} />

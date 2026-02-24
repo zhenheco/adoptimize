@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
 interface AutopilotSettings {
   enabled: boolean;
@@ -11,39 +12,116 @@ interface AutopilotSettings {
   targetCpa: number | null;
   monthlyBudget: number | null;
   autoPauseEnabled: boolean;
+  autoFatigueEnabled: boolean;
   autoAdjustBudgetEnabled: boolean;
   autoBoostEnabled: boolean;
 }
 
-// Mock data - 之後會從 API 取得
+interface LogEntry {
+  id: string;
+  date: string;
+  action: string;
+  savings?: number;
+  earnings?: number;
+}
+
+// Mock data - API 失敗時的預設資料
 const mockSettings: AutopilotSettings = {
   enabled: true,
   goalType: 'maximize_conversions',
   targetCpa: 500,
   monthlyBudget: 50000,
   autoPauseEnabled: true,
+  autoFatigueEnabled: true,
   autoAdjustBudgetEnabled: true,
   autoBoostEnabled: false,
 };
 
-const mockLogs = [
+const mockLogs: LogEntry[] = [
   { id: '1', date: '1/22 14:30', action: '暫停「測試廣告 A」', savings: 2100 },
   { id: '2', date: '1/20 09:15', action: '加碼「熱銷商品」+20%', earnings: 8500 },
   { id: '3', date: '1/18 16:45', action: '暫停 3 個疲勞素材', savings: 1800 },
 ];
 
 export default function AutopilotPage() {
-  const [settings, setSettings] = useState(mockSettings);
+  const [settings, setSettings] = useState<AutopilotSettings>(mockSettings);
+  const [logs, setLogs] = useState<LogEntry[]>(mockLogs);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // 從 API 載入設定和執行記錄
+  useEffect(() => {
+    async function fetchData() {
+      let usingMock = false;
+
+      try {
+        const [settingsRes, logsRes] = await Promise.all([
+          fetchWithAuth('/api/v1/autopilot/settings').catch(() => null),
+          fetchWithAuth('/api/v1/autopilot/logs').catch(() => null),
+        ]);
+
+        if (settingsRes?.ok) {
+          const data = await settingsRes.json();
+          setSettings({
+            ...mockSettings,
+            ...data,
+          });
+        } else {
+          usingMock = true;
+        }
+
+        if (logsRes?.ok) {
+          const data = await logsRes.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setLogs(data);
+          } else {
+            usingMock = true;
+          }
+        } else {
+          usingMock = true;
+        }
+      } catch (err) {
+        console.error('Failed to fetch autopilot data:', err);
+        usingMock = true;
+      }
+
+      setIsUsingMockData(usingMock);
+    }
+
+    fetchData();
+  }, []);
+
+  // 自動關閉 toast
+  useEffect(() => {
+    if (saveToast) {
+      const timer = setTimeout(() => setSaveToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveToast]);
 
   const handleSave = async () => {
     setIsSaving(true);
-    // TODO: 呼叫 API 儲存設定
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
+    try {
+      const res = await fetchWithAuth('/api/v1/autopilot/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      if (res.ok) {
+        setSaveToast('設定已儲存');
+      } else {
+        setSaveToast('儲存失敗，請稍後再試');
+      }
+    } catch (err) {
+      console.error('Failed to save autopilot settings:', err);
+      setSaveToast('儲存失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const totalSavings = mockLogs.reduce((sum, log) => sum + (log.savings || 0), 0);
+  const totalSavings = logs.reduce((sum, log) => sum + (log.savings || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -56,6 +134,20 @@ export default function AutopilotPage() {
           設定目標後，AI 會自動幫你優化廣告
         </p>
       </div>
+
+      {/* 使用展示資料提示 */}
+      {isUsingMockData && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          目前顯示的是展示資料。連接廣告帳號後將顯示真實數據。
+        </div>
+      )}
+
+      {/* 儲存提示 */}
+      {saveToast && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-2 text-sm text-green-700 dark:text-green-300">
+          {saveToast}
+        </div>
+      )}
 
       {/* 狀態卡片 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -221,9 +313,9 @@ export default function AutopilotPage() {
               </p>
             </div>
             <Switch
-              checked={settings.autoPauseEnabled}
+              checked={settings.autoFatigueEnabled}
               onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, autoPauseEnabled: checked }))
+                setSettings((prev) => ({ ...prev, autoFatigueEnabled: checked }))
               }
             />
           </div>
@@ -280,7 +372,7 @@ export default function AutopilotPage() {
         </h2>
 
         <div className="space-y-3">
-          {mockLogs.map((log) => (
+          {logs.map((log) => (
             <div
               key={log.id}
               className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0"

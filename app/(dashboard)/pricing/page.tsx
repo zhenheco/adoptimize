@@ -1,16 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  ArrowLeft,
-  AlertCircle,
-  Check,
-  X,
-  Loader2,
-} from 'lucide-react';
-import Link from 'next/link';
-import { PricingTable } from '@/components/billing';
+import { useEffect, useState } from "react";
+import { ArrowLeft, AlertCircle, Check, X, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { PricingTable } from "@/components/billing";
 
 interface PlanConfig {
   monthly_fee: number;
@@ -40,45 +33,89 @@ export default function PricingPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{
-    type: 'success' | 'error';
+    type: "success" | "error";
     message: string;
   } | null>(null);
 
+  // 預設方案資料（API 失敗時使用）
+  const defaultPlans: Record<string, PlanConfig> = {
+    free: {
+      monthly_fee: 0,
+      commission_rate: 0.1,
+      commission_percent: 10,
+      ai_audience_price: 10,
+      ai_copywriting_price: 5,
+      ai_image_price: 10,
+      monthly_copywriting_quota: 20,
+      monthly_image_quota: 5,
+    },
+    pro: {
+      monthly_fee: 990,
+      commission_rate: 0.05,
+      commission_percent: 5,
+      ai_audience_price: 8,
+      ai_copywriting_price: 3,
+      ai_image_price: 8,
+      monthly_copywriting_quota: 100,
+      monthly_image_quota: 30,
+    },
+    agency: {
+      monthly_fee: 2990,
+      commission_rate: 0.02,
+      commission_percent: 2,
+      ai_audience_price: 5,
+      ai_copywriting_price: 2,
+      ai_image_price: 5,
+      monthly_copywriting_quota: 500,
+      monthly_image_quota: 100,
+    },
+  };
+
+  const defaultSubscription: Subscription = {
+    id: "default",
+    plan: "free",
+    monthly_fee: 0,
+    commission_rate: 0.1,
+    commission_percent: 10,
+    is_active: true,
+  };
+
   // 取得 token
-  const getToken = () => localStorage.getItem('access_token');
+  const getToken = () => localStorage.getItem("access_token");
 
   // 載入資料
   useEffect(() => {
     async function fetchData() {
       const token = getToken();
-      if (!token) {
-        setError('請先登入');
-        setIsLoading(false);
-        return;
-      }
 
       try {
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers: Record<string, string> = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
 
         const [pricingRes, subRes] = await Promise.all([
-          fetch('/api/v1/billing/pricing', { headers }),
-          fetch('/api/v1/billing/subscription', { headers }),
+          fetch("/api/v1/billing/pricing", { headers }),
+          fetch("/api/v1/billing/subscription", { headers }),
         ]);
 
         if (pricingRes.ok) {
           const pricingData = await pricingRes.json();
           setPlans(pricingData.plans);
+        } else {
+          setPlans(defaultPlans);
         }
 
         if (subRes.ok) {
           const subData = await subRes.json();
           setSubscription(subData);
+        } else {
+          setSubscription(defaultSubscription);
         }
       } catch (err) {
-        console.error('Failed to fetch pricing data:', err);
-        setError('載入資料失敗');
+        console.error("Failed to fetch pricing data:", err);
+        setPlans(defaultPlans);
+        setSubscription(defaultSubscription);
       } finally {
         setIsLoading(false);
       }
@@ -93,19 +130,20 @@ export default function PricingPage() {
 
     const token = getToken();
     if (!token) {
-      setToast({ type: 'error', message: '請先登入' });
+      setToast({ type: "error", message: "請先登入" });
       return;
     }
 
     // 確認升級
     const planNames: Record<string, string> = {
-      free: 'Free',
-      pro: 'Pro',
-      agency: 'Agency',
+      free: "Free",
+      pro: "Pro",
+      agency: "Agency",
     };
-    const planOrder = ['free', 'pro', 'agency'];
-    const isUpgrade = planOrder.indexOf(plan) > planOrder.indexOf(subscription.plan);
-    const action = isUpgrade ? '升級' : '變更';
+    const planOrder = ["free", "pro", "agency"];
+    const isUpgrade =
+      planOrder.indexOf(plan) > planOrder.indexOf(subscription.plan);
+    const action = isUpgrade ? "升級" : "變更";
 
     if (!confirm(`確定要${action}到 ${planNames[plan]} 方案嗎？`)) {
       return;
@@ -113,11 +151,11 @@ export default function PricingPage() {
 
     setIsUpgrading(true);
     try {
-      const response = await fetch('/api/v1/billing/subscription/upgrade', {
-        method: 'POST',
+      const response = await fetch("/api/v1/billing/subscription/upgrade", {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ plan }),
       });
@@ -127,18 +165,18 @@ export default function PricingPage() {
       if (response.ok) {
         setSubscription(data);
         setToast({
-          type: 'success',
+          type: "success",
           message: `已成功${action}到 ${planNames[plan]} 方案`,
         });
       } else {
         setToast({
-          type: 'error',
-          message: data.error?.message || data.detail || '方案變更失敗',
+          type: "error",
+          message: data.error?.message || data.detail || "方案變更失敗",
         });
       }
     } catch (err) {
-      console.error('Upgrade error:', err);
-      setToast({ type: 'error', message: '方案變更失敗，請稍後再試' });
+      console.error("Upgrade error:", err);
+      setToast({ type: "error", message: "方案變更失敗，請稍後再試" });
     } finally {
       setIsUpgrading(false);
     }
@@ -160,30 +198,18 @@ export default function PricingPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <AlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-gray-500">{error}</p>
-        <Link href="/auth/login">
-          <Button>前往登入</Button>
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Toast 通知 */}
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-right ${
-            toast.type === 'success'
-              ? 'bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-200'
-              : 'bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-200'
+            toast.type === "success"
+              ? "bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-200"
+              : "bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-200"
           }`}
         >
-          {toast.type === 'success' ? (
+          {toast.type === "success" ? (
             <Check className="w-5 h-5" />
           ) : (
             <AlertCircle className="w-5 h-5" />
@@ -223,9 +249,17 @@ export default function PricingPage() {
           方案差異說明
         </h3>
         <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-          <li>• <strong>操作抽成費率</strong>：執行廣告操作時，依預算金額收取的服務費比例</li>
-          <li>• <strong>AI 配額</strong>：每月免費使用 AI 功能的次數，超額後按次計費</li>
-          <li>• <strong>月費</strong>：方案基本費用，Free 方案完全免費</li>
+          <li>
+            • <strong>操作抽成費率</strong>
+            ：執行廣告操作時，依預算金額收取的服務費比例
+          </li>
+          <li>
+            • <strong>AI 配額</strong>：每月免費使用 AI
+            功能的次數，超額後按次計費
+          </li>
+          <li>
+            • <strong>月費</strong>：方案基本費用，Free 方案完全免費
+          </li>
         </ul>
       </div>
 
@@ -251,8 +285,8 @@ export default function PricingPage() {
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               當您透過廣告船長執行廣告操作（如建立廣告活動、調整預算等）時，
-              系統會根據您的方案費率，按操作金額收取服務費。
-              例如：Free 方案執行 NT$10,000 預算的操作，服務費為 NT$1,000 (10%)。
+              系統會根據您的方案費率，按操作金額收取服務費。 例如：Free 方案執行
+              NT$10,000 預算的操作，服務費為 NT$1,000 (10%)。
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -260,8 +294,7 @@ export default function PricingPage() {
               AI 配額用完會怎樣？
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              配額用完後，您仍可繼續使用 AI 功能，
-              但會從錢包餘額中扣除費用。
+              配額用完後，您仍可繼續使用 AI 功能， 但會從錢包餘額中扣除費用。
               文案生成 NT$5/次，圖片生成 NT$10/次（依方案不同略有差異）。
             </p>
           </div>
@@ -281,8 +314,7 @@ export default function PricingPage() {
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               月費會在每月 1 日從錢包餘額中自動扣除。
-              如果餘額不足，系統會發送通知提醒您儲值。
-              Free 方案沒有月費。
+              如果餘額不足，系統會發送通知提醒您儲值。 Free 方案沒有月費。
             </p>
           </div>
         </div>

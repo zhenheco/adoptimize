@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
 interface Report {
   id: string;
@@ -57,10 +58,36 @@ const typeColors = {
 };
 
 export default function ReportsPage() {
+  const [reports, setReports] = useState<Report[]>(mockReports);
   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
 
-  const filteredReports = mockReports.filter(
+  // 從 API 載入報告，失敗時使用 mock data
+  useEffect(() => {
+    async function fetchReports() {
+      try {
+        const res = await fetchWithAuth('/api/v1/reports');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setReports(data);
+          } else {
+            setIsUsingMockData(true);
+          }
+        } else {
+          setIsUsingMockData(true);
+        }
+      } catch (err) {
+        console.error('Failed to fetch reports:', err);
+        setIsUsingMockData(true);
+      }
+    }
+
+    fetchReports();
+  }, []);
+
+  const filteredReports = reports.filter(
     (report) => filter === 'all' || report.type === filter
   );
 
@@ -87,6 +114,13 @@ export default function ReportsPage() {
           查看週報和月報，了解廣告表現
         </p>
       </div>
+
+      {/* 使用展示資料提示 */}
+      {isUsingMockData && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          目前顯示的是展示資料。連接廣告帳號後將顯示真實報告。
+        </div>
+      )}
 
       {/* 篩選器 */}
       <div className="flex gap-2">

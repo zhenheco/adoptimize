@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Car,
@@ -16,10 +16,10 @@ import {
   Moon,
   Ship,
   Wallet,
-} from 'lucide-react';
-import { RestartTourButton } from '@/components/onboarding';
-import { Button } from '@/components/ui/button';
-import { useUser } from '@/hooks/use-user';
+} from "lucide-react";
+import { RestartTourButton } from "@/components/onboarding";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@/hooks/use-user";
 
 /**
  * 導航項目介面
@@ -36,12 +36,12 @@ interface NavItem {
  * SDD v2.0: 簡化導航，聚焦自動駕駛和 AI 創作
  */
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: '首頁', icon: LayoutDashboard },
-  { href: '/autopilot', label: '自動駕駛', icon: Car },
-  { href: '/ai-studio', label: 'AI 創作', icon: Sparkles },
-  { href: '/reports', label: '報告', icon: FileText },
-  { href: '/accounts', label: '帳號連接', icon: Link2 },
-  { href: '/billing', label: '帳單', icon: Wallet },
+  { href: "/dashboard", label: "首頁", icon: LayoutDashboard },
+  { href: "/autopilot", label: "自動駕駛", icon: Car },
+  { href: "/ai-studio", label: "AI 創作", icon: Sparkles },
+  { href: "/reports", label: "報告", icon: FileText },
+  { href: "/accounts", label: "帳號連接", icon: Link2 },
+  { href: "/billing", label: "帳單", icon: Wallet },
 ];
 
 /**
@@ -58,8 +58,8 @@ export function Sidebar() {
    * 判斷導航項目是否為當前頁面
    */
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
+    if (href === "/dashboard") {
+      return pathname === "/dashboard";
     }
     return pathname.startsWith(href);
   };
@@ -68,19 +68,23 @@ export function Sidebar() {
    * 切換深淺色主題
    */
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   /**
    * 登出功能
+   * 先清除 httpOnly cookie，再清除 localStorage
    */
-  const handleLogout = () => {
-    // 清除 localStorage 中的 token 和 user
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // 即使 API 呼叫失敗，仍繼續清除本地狀態
+    }
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     clearUser();
-    // 導向登入頁面
-    router.push('/auth/login');
+    router.push("/auth/login");
   };
 
   return (
@@ -101,7 +105,7 @@ export function Sidebar() {
             size="icon"
             onClick={toggleTheme}
             className="h-8 w-8"
-            title={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'}
+            title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -121,10 +125,10 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
               )}
             >
               <Icon className="w-5 h-5" />
@@ -156,7 +160,10 @@ export function Sidebar() {
       {/* 用戶資訊 */}
       {userEmail && (
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={userEmail}>
+          <p
+            className="text-xs text-gray-500 dark:text-gray-400 truncate"
+            title={userEmail}
+          >
             {userEmail}
           </p>
         </div>

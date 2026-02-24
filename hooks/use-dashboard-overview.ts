@@ -1,7 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import type { DashboardOverview, ApiResponse, TimePeriod } from '@/lib/api/types';
+import { useState, useEffect, useCallback } from "react";
+import type {
+  DashboardOverview,
+  ApiResponse,
+  TimePeriod,
+} from "@/lib/api/types";
+import { fetchWithAuth } from "@/lib/api/fetch-with-auth";
 
 /**
  * 儀表板總覽 Hook 回傳型別
@@ -31,7 +36,7 @@ interface UseDashboardOverviewReturn {
  * ```
  */
 export function useDashboardOverview(
-  period: TimePeriod = '7d'
+  period: TimePeriod = "7d",
 ): UseDashboardOverviewReturn {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +47,9 @@ export function useDashboardOverview(
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/dashboard/overview?period=${period}`);
+      const response = await fetchWithAuth(
+        `/api/v1/dashboard/overview?period=${period}`,
+      );
 
       if (!response.ok) {
         throw new Error(`API 請求失敗: ${response.status}`);
@@ -51,7 +58,7 @@ export function useDashboardOverview(
       const result: ApiResponse<DashboardOverview> = await response.json();
       setData(result.data);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('未知錯誤'));
+      setError(err instanceof Error ? err : new Error("未知錯誤"));
     } finally {
       setIsLoading(false);
     }
