@@ -2,13 +2,9 @@
 """
 APScheduler 定時任務管理
 
-排程：
+排程（MVP：僅 Google + Meta）：
 - 每 10 分鐘：Meta Ads 數據同步
 - 每 15 分鐘：Google Ads 數據同步
-- 每 15 分鐘：LinkedIn Ads 數據同步
-- 每 15 分鐘：Pinterest Ads 數據同步
-- 每 15 分鐘：TikTok Ads 數據同步
-- 每 15 分鐘：Reddit Ads 數據同步
 - 每 15 分鐘：自動駕駛規則檢查
 - 每天 21:00：每日摘要
 - 每週一 09:00：週報生成
@@ -84,18 +80,9 @@ meta_sync_job = _create_platform_sync_job(
 google_sync_job = _create_platform_sync_job(
     "Google Ads", "app.workers.sync_google", "_get_google_accounts", "_sync_google_account",
 )
-linkedin_sync_job = _create_platform_sync_job(
-    "LinkedIn", "app.workers.sync_linkedin", "_get_linkedin_accounts", "_sync_linkedin_account",
-)
-pinterest_sync_job = _create_platform_sync_job(
-    "Pinterest", "app.workers.sync_pinterest", "_get_pinterest_accounts", "_sync_pinterest_account",
-)
-tiktok_sync_job = _create_platform_sync_job(
-    "TikTok", "app.workers.sync_tiktok", "_get_tiktok_accounts", "_sync_tiktok_account",
-)
-reddit_sync_job = _create_platform_sync_job(
-    "Reddit", "app.workers.sync_reddit", "_get_reddit_accounts", "_sync_reddit_account",
-)
+
+# MVP 階段暫不啟用：LinkedIn, Pinterest, TikTok, Reddit
+# 這些平台的 sync worker 保留在 codebase 中，待 API 權限取得後再啟用
 
 
 async def autopilot_check_job():
@@ -204,41 +191,7 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-    # 每 15 分鐘執行 LinkedIn Ads 數據同步
-    scheduler.add_job(
-        linkedin_sync_job,
-        trigger=IntervalTrigger(minutes=15),
-        id="linkedin_ads_sync",
-        name="LinkedIn Ads 數據同步",
-        replace_existing=True,
-    )
-
-    # 每 15 分鐘執行 Pinterest Ads 數據同步
-    scheduler.add_job(
-        pinterest_sync_job,
-        trigger=IntervalTrigger(minutes=15),
-        id="pinterest_ads_sync",
-        name="Pinterest Ads 數據同步",
-        replace_existing=True,
-    )
-
-    # 每 15 分鐘執行 TikTok Ads 數據同步
-    scheduler.add_job(
-        tiktok_sync_job,
-        trigger=IntervalTrigger(minutes=15),
-        id="tiktok_ads_sync",
-        name="TikTok Ads 數據同步",
-        replace_existing=True,
-    )
-
-    # 每 15 分鐘執行 Reddit Ads 數據同步
-    scheduler.add_job(
-        reddit_sync_job,
-        trigger=IntervalTrigger(minutes=15),
-        id="reddit_ads_sync",
-        name="Reddit Ads 數據同步",
-        replace_existing=True,
-    )
+    # MVP 階段暫不啟用：LinkedIn, Pinterest, TikTok, Reddit sync jobs
 
     scheduler.start()
     logger.info("APScheduler started with jobs:")

@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Link2,
   Plus,
@@ -14,25 +20,25 @@ import {
   X,
   ExternalLink,
   Clock,
-} from 'lucide-react';
+  Lock,
+} from "lucide-react";
 
 /**
  * 帳戶狀態類型
  */
-type AccountStatus = 'connected' | 'expired' | 'error';
+type AccountStatus = "connected" | "expired" | "error";
 
 /**
  * 帳戶資料介面
  */
 interface AdAccount {
   id: string;
-  platform: 'google' | 'meta' | 'tiktok' | 'reddit' | 'linkedin' | 'pinterest';
+  platform: "google" | "meta" | "tiktok" | "reddit" | "linkedin" | "pinterest";
   name: string;
   accountId: string;
   status: AccountStatus;
   lastSync: string;
 }
-
 
 /**
  * 帳戶卡片元件
@@ -46,40 +52,40 @@ interface AccountCardProps {
 function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
   const platformStyles = {
     google: {
-      bg: 'bg-red-100 dark:bg-red-900/30',
-      text: 'text-red-600 dark:text-red-400',
-      label: 'Google Ads',
-      icon: 'G',
+      bg: "bg-red-100 dark:bg-red-900/30",
+      text: "text-red-600 dark:text-red-400",
+      label: "Google Ads",
+      icon: "G",
     },
     meta: {
-      bg: 'bg-blue-100 dark:bg-blue-900/30',
-      text: 'text-blue-600 dark:text-blue-400',
-      label: 'Meta Ads',
-      icon: 'M',
+      bg: "bg-blue-100 dark:bg-blue-900/30",
+      text: "text-blue-600 dark:text-blue-400",
+      label: "Meta Ads",
+      icon: "M",
     },
     tiktok: {
-      bg: 'bg-gray-900 dark:bg-gray-800',
-      text: 'text-white dark:text-gray-100',
-      label: 'TikTok Ads',
-      icon: 'T',
+      bg: "bg-gray-900 dark:bg-gray-800",
+      text: "text-white dark:text-gray-100",
+      label: "TikTok Ads",
+      icon: "T",
     },
     reddit: {
-      bg: 'bg-orange-600 dark:bg-orange-700',
-      text: 'text-white dark:text-gray-100',
-      label: 'Reddit Ads',
-      icon: 'R',
+      bg: "bg-orange-600 dark:bg-orange-700",
+      text: "text-white dark:text-gray-100",
+      label: "Reddit Ads",
+      icon: "R",
     },
     linkedin: {
-      bg: 'bg-blue-700 dark:bg-blue-800',
-      text: 'text-white dark:text-gray-100',
-      label: 'LinkedIn Ads',
-      icon: 'in',
+      bg: "bg-blue-700 dark:bg-blue-800",
+      text: "text-white dark:text-gray-100",
+      label: "LinkedIn Ads",
+      icon: "in",
     },
     pinterest: {
-      bg: 'bg-red-600 dark:bg-red-700',
-      text: 'text-white dark:text-gray-100',
-      label: 'Pinterest Ads',
-      icon: 'P',
+      bg: "bg-red-600 dark:bg-red-700",
+      text: "text-white dark:text-gray-100",
+      label: "Pinterest Ads",
+      icon: "P",
     },
   };
 
@@ -88,21 +94,23 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
   const statusConfig = {
     connected: {
       icon: <Check className="w-4 h-4" />,
-      label: '已連結',
-      variant: 'default' as const,
-      className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      label: "已連結",
+      variant: "default" as const,
+      className:
+        "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
     },
     expired: {
       icon: <Clock className="w-4 h-4" />,
-      label: '授權過期',
-      variant: 'secondary' as const,
-      className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      label: "授權過期",
+      variant: "secondary" as const,
+      className:
+        "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
     },
     error: {
       icon: <AlertCircle className="w-4 h-4" />,
-      label: '連線錯誤',
-      variant: 'destructive' as const,
-      className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      label: "連線錯誤",
+      variant: "destructive" as const,
+      className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     },
   };
 
@@ -110,12 +118,12 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
 
   const formatLastSync = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleString('zh-TW', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleString("zh-TW", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -193,7 +201,7 @@ function AccountsContent() {
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{
-    type: 'success' | 'error';
+    type: "success" | "error";
     message: string;
   } | null>(null);
 
@@ -201,32 +209,43 @@ function AccountsContent() {
   useEffect(() => {
     async function fetchAccounts() {
       try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('/api/v1/accounts', {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch("/api/v1/accounts", {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (response.ok) {
           const result = await response.json();
           // 轉換 API 格式為前端格式
-          const apiAccounts = (result.data || []).map((acc: {
-            id: string;
-            platform: string;
-            name: string;
-            external_id: string;
-            status: string;
-            last_synced_at: string;
-          }) => ({
-            id: acc.id,
-            platform: acc.platform as 'google' | 'meta' | 'tiktok' | 'reddit' | 'linkedin' | 'pinterest',
-            name: acc.name,
-            accountId: acc.external_id,
-            status: acc.status === 'active' ? 'connected' : acc.status as AccountStatus,
-            lastSync: acc.last_synced_at || new Date().toISOString(),
-          }));
+          const apiAccounts = (result.data || []).map(
+            (acc: {
+              id: string;
+              platform: string;
+              name: string;
+              external_id: string;
+              status: string;
+              last_synced_at: string;
+            }) => ({
+              id: acc.id,
+              platform: acc.platform as
+                | "google"
+                | "meta"
+                | "tiktok"
+                | "reddit"
+                | "linkedin"
+                | "pinterest",
+              name: acc.name,
+              accountId: acc.external_id,
+              status:
+                acc.status === "active"
+                  ? "connected"
+                  : (acc.status as AccountStatus),
+              lastSync: acc.last_synced_at || new Date().toISOString(),
+            }),
+          );
           setAccounts(apiAccounts);
         }
       } catch (error) {
-        console.error('Failed to fetch accounts:', error);
+        console.error("Failed to fetch accounts:", error);
       } finally {
         setIsLoading(false);
       }
@@ -236,27 +255,27 @@ function AccountsContent() {
 
   // 處理 OAuth callback query params
   useEffect(() => {
-    const success = searchParams.get('success');
-    const error = searchParams.get('error');
-    const accountId = searchParams.get('account_id');
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const accountId = searchParams.get("account_id");
 
     if (success) {
       const platformNames: Record<string, string> = {
-        google: 'Google Ads',
-        meta: 'Meta Ads',
-        tiktok: 'TikTok Ads',
-        reddit: 'Reddit Ads',
-        linkedin: 'LinkedIn Ads',
-        pinterest: 'Pinterest Ads',
+        google: "Google Ads",
+        meta: "Meta Ads",
+        tiktok: "TikTok Ads",
+        reddit: "Reddit Ads",
+        linkedin: "LinkedIn Ads",
+        pinterest: "Pinterest Ads",
       };
       const platform = platformNames[success] || success;
       setToast({
-        type: 'success',
-        message: `成功連結 ${platform} 帳戶${accountId ? ` (${accountId})` : ''}`,
+        type: "success",
+        message: `成功連結 ${platform} 帳戶${accountId ? ` (${accountId})` : ""}`,
       });
     } else if (error) {
       setToast({
-        type: 'error',
+        type: "error",
         message: `連結失敗: ${decodeURIComponent(error)}`,
       });
     }
@@ -273,12 +292,12 @@ function AccountsContent() {
    */
   const handleConnectGoogle = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        setToast({ type: "error", message: "請先登入才能連接廣告帳戶" });
         return;
       }
-      const response = await fetch('/api/v1/accounts/connect/google', {
+      const response = await fetch("/api/v1/accounts/connect/google", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
@@ -289,14 +308,15 @@ function AccountsContent() {
       } else {
         const error = await response.json();
         // 確保錯誤訊息是字串，不是物件
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
+        const errorMsg =
+          typeof error.error === "string"
+            ? error.error
+            : error.error?.message || "無法取得授權連結";
+        setToast({ type: "error", message: errorMsg });
       }
     } catch (error) {
-      console.error('Connect Google error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+      console.error("Connect Google error:", error);
+      setToast({ type: "error", message: "連接失敗，請稍後再試" });
     }
   };
 
@@ -305,12 +325,12 @@ function AccountsContent() {
    */
   const handleConnectMeta = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
+        setToast({ type: "error", message: "請先登入才能連接廣告帳戶" });
         return;
       }
-      const response = await fetch('/api/v1/accounts/connect/meta', {
+      const response = await fetch("/api/v1/accounts/connect/meta", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
@@ -321,138 +341,15 @@ function AccountsContent() {
       } else {
         const error = await response.json();
         // 確保錯誤訊息是字串，不是物件
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
+        const errorMsg =
+          typeof error.error === "string"
+            ? error.error
+            : error.error?.message || "無法取得授權連結";
+        setToast({ type: "error", message: errorMsg });
       }
     } catch (error) {
-      console.error('Connect Meta error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
-    }
-  };
-
-  /**
-   * 連結 TikTok 帳戶
-   */
-  const handleConnectTikTok = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
-        return;
-      }
-      const response = await fetch('/api/v1/accounts/connect/tiktok', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.auth_url) {
-          window.location.href = data.auth_url;
-        }
-      } else {
-        const error = await response.json();
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
-      }
-    } catch (error) {
-      console.error('Connect TikTok error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
-    }
-  };
-
-  /**
-   * 連結 Reddit 帳戶
-   */
-  const handleConnectReddit = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
-        return;
-      }
-      const response = await fetch('/api/v1/accounts/connect/reddit', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.auth_url) {
-          window.location.href = data.auth_url;
-        }
-      } else {
-        const error = await response.json();
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
-      }
-    } catch (error) {
-      console.error('Connect Reddit error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
-    }
-  };
-
-  /**
-   * 連結 LinkedIn 帳戶
-   */
-  const handleConnectLinkedIn = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
-        return;
-      }
-      const response = await fetch('/api/v1/accounts/connect/linkedin', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.auth_url) {
-          window.location.href = data.auth_url;
-        }
-      } else {
-        const error = await response.json();
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
-      }
-    } catch (error) {
-      console.error('Connect LinkedIn error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
-    }
-  };
-
-  /**
-   * 連結 Pinterest 帳戶
-   */
-  const handleConnectPinterest = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setToast({ type: 'error', message: '請先登入才能連接廣告帳戶' });
-        return;
-      }
-      const response = await fetch('/api/v1/accounts/connect/pinterest', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.auth_url) {
-          window.location.href = data.auth_url;
-        }
-      } else {
-        const error = await response.json();
-        const errorMsg = typeof error.error === 'string'
-          ? error.error
-          : error.error?.message || '無法取得授權連結';
-        setToast({ type: 'error', message: errorMsg });
-      }
-    } catch (error) {
-      console.error('Connect Pinterest error:', error);
-      setToast({ type: 'error', message: '連接失敗，請稍後再試' });
+      console.error("Connect Meta error:", error);
+      setToast({ type: "error", message: "連接失敗，請稍後再試" });
     }
   };
 
@@ -460,11 +357,11 @@ function AccountsContent() {
    * 同步帳戶資料
    */
   const handleRefresh = (id: string) => {
-    console.log('Refreshing account:', id);
+    console.log("Refreshing account:", id);
     // TODO: 呼叫 API 觸發同步
     setToast({
-      type: 'success',
-      message: '已觸發資料同步，請稍候...',
+      type: "success",
+      message: "已觸發資料同步，請稍候...",
     });
     setTimeout(() => setToast(null), 3000);
   };
@@ -474,9 +371,9 @@ function AccountsContent() {
    */
   const handleDisconnect = async (id: string) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       const response = await fetch(`/api/v1/accounts/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
@@ -487,13 +384,14 @@ function AccountsContent() {
       // API 成功後才更新 UI
       setAccounts((prev) => prev.filter((a) => a.id !== id));
       setToast({
-        type: 'success',
-        message: '已中斷帳戶連結',
+        type: "success",
+        message: "已中斷帳戶連結",
       });
     } catch (error) {
       setToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : '中斷連結失敗，請稍後再試',
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "中斷連結失敗，請稍後再試",
       });
     }
     setTimeout(() => setToast(null), 3000);
@@ -505,12 +403,12 @@ function AccountsContent() {
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-right ${
-            toast.type === 'success'
-              ? 'bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-200'
-              : 'bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-200'
+            toast.type === "success"
+              ? "bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-200"
+              : "bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-200"
           }`}
         >
-          {toast.type === 'success' ? (
+          {toast.type === "success" ? (
             <Check className="w-5 h-5" />
           ) : (
             <AlertCircle className="w-5 h-5" />
@@ -547,55 +445,48 @@ function AccountsContent() {
             <div>
               <CardTitle className="text-lg">連結新帳戶</CardTitle>
               <CardDescription>
-                連結您的 Google Ads、Meta、TikTok、Reddit、LinkedIn 或 Pinterest 廣告帳戶以開始優化廣告投放
+                連結您的 Google Ads 或 Meta Ads 廣告帳戶以開始優化廣告投放
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
-            <Button onClick={handleConnectGoogle} className="flex-1 min-w-[150px]">
+            <Button
+              onClick={handleConnectGoogle}
+              className="flex-1 min-w-[150px]"
+            >
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 Google Ads
             </Button>
-            <Button onClick={handleConnectMeta} variant="outline" className="flex-1 min-w-[150px]">
+            <Button
+              onClick={handleConnectMeta}
+              variant="outline"
+              className="flex-1 min-w-[150px]"
+            >
               <ExternalLink className="w-4 h-4 mr-2" />
               連結 Meta Ads
             </Button>
-            <Button
-              onClick={handleConnectTikTok}
-              variant="outline"
-              className="flex-1 min-w-[150px] bg-gray-900 text-white hover:bg-gray-800 border-gray-900"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 TikTok Ads
-            </Button>
-            <Button
-              onClick={handleConnectReddit}
-              variant="outline"
-              className="flex-1 min-w-[150px] bg-orange-600 text-white hover:bg-orange-700 border-orange-600"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 Reddit Ads
-            </Button>
-            <Button
-              onClick={handleConnectLinkedIn}
-              variant="outline"
-              className="flex-1 min-w-[150px] bg-blue-700 text-white hover:bg-blue-800 border-blue-700"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 LinkedIn Ads
-            </Button>
-            <Button
-              onClick={handleConnectPinterest}
-              variant="outline"
-              className="flex-1 min-w-[150px] bg-red-600 text-white hover:bg-red-700 border-red-600"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 Pinterest Ads
-            </Button>
           </div>
-
+          <div className="flex flex-wrap gap-3 mt-4">
+            {[
+              { label: "TikTok Ads", color: "bg-gray-800" },
+              { label: "Reddit Ads", color: "bg-orange-600" },
+              { label: "LinkedIn Ads", color: "bg-blue-700" },
+              { label: "Pinterest Ads", color: "bg-red-600" },
+            ].map((platform) => (
+              <div
+                key={platform.label}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed"
+              >
+                <Lock className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-sm text-gray-400">{platform.label}</span>
+                <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">
+                  即將推出
+                </span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

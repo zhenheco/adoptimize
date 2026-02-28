@@ -22,13 +22,26 @@ import {
 /**
  * 平台標誌元件 - 顯示支援的廣告平台
  */
-function PlatformBadge({ name, color }: { name: string; color: string }) {
+function PlatformBadge({
+  name,
+  color,
+  comingSoon = false,
+}: {
+  name: string;
+  color: string;
+  comingSoon?: boolean;
+}) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide ${color}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide ${comingSoon ? "text-slate-500 bg-slate-500/10" : color}`}
     >
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${comingSoon ? "bg-slate-500 opacity-40" : "bg-current opacity-80"}`}
+      />
       {name}
+      {comingSoon && (
+        <span className="text-[10px] font-normal opacity-60">即將推出</span>
+      )}
     </span>
   );
 }
@@ -152,18 +165,22 @@ export default function HomePage() {
             <PlatformBadge
               name="TikTok Ads"
               color="text-pink-400 bg-pink-400/10"
+              comingSoon
             />
             <PlatformBadge
               name="LinkedIn Ads"
               color="text-indigo-400 bg-indigo-400/10"
+              comingSoon
             />
             <PlatformBadge
               name="Reddit Ads"
               color="text-orange-400 bg-orange-400/10"
+              comingSoon
             />
             <PlatformBadge
               name="Pinterest Ads"
               color="text-red-400 bg-red-400/10"
+              comingSoon
             />
           </div>
 
@@ -183,8 +200,9 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-6 text-lg text-slate-400 leading-relaxed max-w-xl">
-              廣告船長整合六大廣告平台，用 AI 幫你看數據、抓問題、省預算。
-              你只需要每天花 5 分鐘，就能掌握全部廣告表現。
+              廣告船長整合 Google Ads 與 Meta Ads 兩大平台，用 AI
+              幫你看數據、抓問題、省預算。 你只需要每天花 5
+              分鐘，就能掌握全部廣告表現。
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
@@ -214,7 +232,7 @@ export default function HomePage() {
           id="scene-1"
           timeLabel="早上 9:00"
           headline="打開廣告船長，一眼看完所有平台"
-          description="不用再輪流登入 Google、Meta、TikTok、LinkedIn 四個後台了。所有平台的花費、轉換、ROAS 全部整合在同一個畫面，30 秒就能掌握今天的狀況。"
+          description="不用再輪流登入 Google 和 Meta 兩個後台了。所有平台的花費、轉換、ROAS 全部整合在同一個畫面，30 秒就能掌握今天的狀況。"
         >
           {/* 模擬整合儀表板 */}
           <div className="relative">
@@ -244,20 +262,6 @@ export default function HomePage() {
                     conv: "986",
                     roas: "3.8x",
                     color: "bg-sky-400",
-                  },
-                  {
-                    platform: "TikTok Ads",
-                    spend: "NT$ 28,600",
-                    conv: "1,024",
-                    roas: "4.1x",
-                    color: "bg-pink-400",
-                  },
-                  {
-                    platform: "LinkedIn Ads",
-                    spend: "NT$ 19,550",
-                    conv: "590",
-                    roas: "3.2x",
-                    color: "bg-indigo-400",
                   },
                 ].map((row) => (
                   <div
@@ -297,9 +301,9 @@ export default function HomePage() {
               <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between">
                 <span className="text-xs text-slate-500">全平台合計</span>
                 <div className="flex items-center gap-6 text-xs">
-                  <span className="text-amber-400 font-bold">NT$ 128,450</span>
-                  <span className="text-white font-medium">3,847 轉換</span>
-                  <span className="text-emerald-400 font-bold">ROAS 4.0x</span>
+                  <span className="text-amber-400 font-bold">NT$ 80,300</span>
+                  <span className="text-white font-medium">2,233 轉換</span>
+                  <span className="text-emerald-400 font-bold">ROAS 4.2x</span>
                 </div>
               </div>
             </div>
@@ -350,14 +354,14 @@ export default function HomePage() {
                 />
                 <AiBubble
                   icon={Target}
-                  message="偵測到 TikTok 素材疲勞"
-                  detail="「開箱影片 v2」點擊率下降 25%，建議更換素材"
+                  message="偵測到 Meta 素材疲勞"
+                  detail="「春季形象廣告 v2」點擊率下降 25%，建議更換素材"
                   accent="bg-amber-400/20 text-amber-400"
                 />
                 <AiBubble
                   icon={TrendingUp}
-                  message="已重新分配跨平台預算"
-                  detail="將 LinkedIn 閒置預算 NT$ 900 轉移至表現更好的 Google Ads"
+                  message="跨平台預算建議"
+                  detail="Meta CPA 偏高，建議將 NT$ 2,000 預算轉移至 Google Ads"
                   accent="bg-blue-400/20 text-blue-400"
                 />
               </div>
@@ -458,12 +462,10 @@ export default function HomePage() {
               </div>
 
               {/* 平台細分 */}
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {[
-                  { name: "Google", roas: "4.5x" },
-                  { name: "Meta", roas: "3.8x" },
-                  { name: "TikTok", roas: "4.1x" },
-                  { name: "LinkedIn", roas: "3.2x" },
+                  { name: "Google Ads", roas: "4.5x" },
+                  { name: "Meta Ads", roas: "3.8x" },
                 ].map((p) => (
                   <div
                     key={p.name}
@@ -500,7 +502,7 @@ export default function HomePage() {
               { value: "30%", label: "平均節省廣告成本", icon: TrendingUp },
               { value: "1.5x", label: "平均投報率提升", icon: BarChart3 },
               { value: "2 hrs", label: "每天省下的報表時間", icon: Clock },
-              { value: "6+", label: "支援廣告平台", icon: Globe },
+              { value: "2+", label: "支援廣告平台", icon: Globe },
             ].map((stat) => (
               <div
                 key={stat.label}
@@ -630,9 +632,8 @@ export default function HomePage() {
                 <span className="font-bold">廣告船長</span>
               </div>
               <p className="text-sm text-slate-500 leading-relaxed">
-                跨平台 AI 廣告優化工具。整合 Google
-                Ads、Meta、TikTok、LinkedIn、Reddit、Pinterest 六大平台，
-                幫助廣告主提升投放效率與投資報酬率。
+                跨平台 AI 廣告優化工具。整合 Google Ads 與 Meta Ads 兩大平台，
+                幫助廣告主提升投放效率與投資報酬率。更多平台即將推出。
               </p>
             </div>
 
