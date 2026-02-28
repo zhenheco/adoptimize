@@ -4,10 +4,19 @@
 使用 Pydantic Settings 管理環境變數
 """
 
+import sys
 from functools import lru_cache
 from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# JWT secret 不可使用的佔位值（hardcoded placeholder）
+_JWT_INSECURE_DEFAULTS = frozenset({
+    "your-super-secret-key-change-in-production",
+    "change-me",
+    "secret",
+    "",
+})
 
 
 class Settings(BaseSettings):
@@ -67,11 +76,22 @@ class Settings(BaseSettings):
     # CORS 設定 (存為字串，支援逗號分隔格式)
     CORS_ORIGINS: str = "http://localhost:3000"
 
-    # JWT 設定
+    # JWT 設定（JWT_SECRET_KEY 必須透過環境變數設定，不可使用預設值）
     JWT_SECRET_KEY: str = "your-super-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    def validate_jwt_secret(self) -> None:
+        """驗證 JWT_SECRET_KEY 不是不安全的預設值。生產環境啟動時必須呼叫。"""
+        if self.JWT_SECRET_KEY in _JWT_INSECURE_DEFAULTS:
+            print(
+                "FATAL: JWT_SECRET_KEY is using an insecure default value. "
+                "Set a strong, unique JWT_SECRET_KEY in your .env or environment variables. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\"",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
 
     # AI API 設定（智慧建議引擎）
     AI_PROVIDER: str = "anthropic"  # 'anthropic' 或 'openai'
@@ -117,5 +137,9 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """取得設定單例 (使用快取)"""
-    return Settings()
+    """取得設定單例 (使用快取)，並驗證安全性設定"""
+    s = Settings()
+    # 非 DEBUG 模式下，強制驗證 JWT secret 不是佔位值
+    if not s.DEBUG:
+        s.validate_jwt_secret()
+    return s
