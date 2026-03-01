@@ -29,10 +29,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_app_logging()
     setup_logging(level=settings.LOG_LEVEL)
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+
+    # 初始化 Redis 連線
+    from app.services.redis_client import get_redis_client
+    redis_client = get_redis_client()
+    try:
+        await redis_client.connect()
+        logger.info("Redis connected successfully")
+    except Exception as e:
+        logger.error(f"Redis connection failed: {e}")
+
     setup_scheduler()
     yield
     # 關閉時執行
     shutdown_scheduler()
+    try:
+        await redis_client.disconnect()
+    except Exception:
+        pass
     logger.info(f"Shutting down {settings.APP_NAME}")
 
 
