@@ -5,7 +5,7 @@
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -28,7 +28,7 @@ class HealthAudit(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    account_id: Mapped[uuid.UUID] = mapped_column(
+    ad_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ad_accounts.id", ondelete="CASCADE"),
         nullable=False,
@@ -69,6 +69,15 @@ class HealthAudit(Base):
         String(1),
         nullable=True,
         comment="評級: A, B, C, D, F",
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="completed",
+        comment="狀態: completed, in_progress, failed",
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

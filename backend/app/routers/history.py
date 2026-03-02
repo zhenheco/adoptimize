@@ -93,8 +93,8 @@ async def revert_action(
     # 標記操作已還原
     reverted_at = datetime.now(timezone.utc)
     try:
-        history_record.reverted = True
-        history_record.reverted_at = reverted_at
+        history_record.status = "rolled_back"
+        history_record.rolled_back_at = reverted_at
         await db.flush()
     except Exception as e:
         logger.error(f"Database update failed in revert_action: {e}")

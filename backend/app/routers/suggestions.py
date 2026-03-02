@@ -44,6 +44,10 @@ from app.services.ai_suggestion_engine import (
     generate_mock_suggestion,
     suggestion_output_to_dict,
 )
+from app.services.meta_audience_service import (
+    InterestTargeting,
+    MetaAudienceService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +171,8 @@ class CreateAdRequest(BaseModel):
     """建立廣告請求"""
 
     campaign_id: str = Field(..., description="廣告活動 ID")
+    page_id: str = Field(..., description="Facebook 粉絲專頁 ID")
+    link_url: str = Field(..., description="廣告連結 URL")
     daily_budget: float = Field(..., gt=0, description="每日預算（台幣）")
     ad_name: Optional[str] = Field(None, description="廣告名稱（選填）")
     use_suggested_copy: bool = Field(True, description="是否使用 AI 建議文案")
@@ -735,19 +741,59 @@ async def save_audience(
     # 產生受眾名稱
     audience_name = request.audience_name or f"AI建議受眾_{_get_industry_name(suggestion.industry_code)}_{datetime.now().strftime('%Y%m%d_%H%M')}"
 
-    # TODO: 呼叫 Meta API 建立受眾
-    # 目前先模擬成功
-    mock_audience_id = f"meta_audience_{uuid.uuid4().hex[:8]}"
+    # 取得用戶的 Meta AdAccount
+    account_result = await db.execute(
+        select(AdAccount).where(
+            AdAccount.id == suggestion.account_id,
+            AdAccount.user_id == current_user.id,
+            AdAccount.platform == "meta",
+        )
+    )
+    account = account_result.scalar_one_or_none()
+
+    if not account or not account.access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="未找到已連結的 Meta 廣告帳戶，請先連結帳戶",
+        )
+
+    # 從 suggestion 的 suggested_interests 建構 InterestTargeting
+    interests = suggestion.suggested_interests or []
+    interest_ids = [i.get("meta_interest_id", "") for i in interests if isinstance(i, dict)]
+    interest_names = [i.get("name", "") for i in interests if isinstance(i, dict)]
+
+    if not interest_ids:
+        raise HTTPException(status_code=400, detail="建議中沒有可用的興趣標籤")
+
+    targeting = InterestTargeting(
+        interest_ids=interest_ids,
+        interest_names=interest_names,
+    )
+
+    # 呼叫 Meta API 建立受眾
+    service = MetaAudienceService(db)
+    result = await service.create_saved_audience(
+        account_id=account.id,
+        ad_account_external_id=account.external_id,
+        audience_name=audience_name,
+        targeting=targeting,
+    )
+
+    if not result.success:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Meta API 建立受眾失敗: {result.error_message}",
+        )
 
     # 更新建議狀態
     suggestion.status = "saved"
-    suggestion.meta_audience_id = mock_audience_id
+    suggestion.meta_audience_id = result.audience_id
     await db.flush()
 
     return SaveAudienceResponse(
         success=True,
         suggestion_id=suggestion_id,
-        meta_audience_id=mock_audience_id,
+        meta_audience_id=result.audience_id,
         audience_name=audience_name,
         message="受眾已成功建立",
     )
@@ -799,32 +845,80 @@ async def create_ad(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
 
+    # 取得用戶的 Meta AdAccount
+    account_result = await db.execute(
+        select(AdAccount).where(
+            AdAccount.id == suggestion.account_id,
+            AdAccount.user_id == current_user.id,
+            AdAccount.platform == "meta",
+        )
+    )
+    account = account_result.scalar_one_or_none()
+
+    if not account or not account.access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="未找到已連結的 Meta 廣告帳戶，請先連結帳戶",
+        )
+
     # 產生名稱
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     adset_name = f"AI建議廣告組合_{_get_industry_name(suggestion.industry_code)}_{timestamp}"
     ad_name = request.ad_name or f"AI建議廣告_{timestamp}"
 
-    # TODO: 呼叫 Meta API 建立 Ad Set 和 Ad
-    # 目前先模擬成功
-    mock_adset_id = f"meta_adset_{uuid.uuid4().hex[:8]}"
-    mock_ad_id = f"meta_ad_{uuid.uuid4().hex[:8]}"
+    # 從 suggestion 建構 InterestTargeting
+    interests = suggestion.suggested_interests or []
+    interest_ids = [i.get("meta_interest_id", "") for i in interests if isinstance(i, dict)]
+    interest_names = [i.get("name", "") for i in interests if isinstance(i, dict)]
 
-    # 如果尚未建立受眾，先建立
-    if not suggestion.meta_audience_id:
-        suggestion.meta_audience_id = f"meta_audience_{uuid.uuid4().hex[:8]}"
+    if not interest_ids:
+        raise HTTPException(status_code=400, detail="建議中沒有可用的興趣標籤")
+
+    targeting = InterestTargeting(
+        interest_ids=interest_ids,
+        interest_names=interest_names,
+    )
+
+    # 決定廣告文案
+    ad_copy = request.custom_ad_copy if not request.use_suggested_copy else (suggestion.suggested_ad_copy or "")
+    if not ad_copy:
+        ad_copy = f"AI 建議廣告 - {_get_industry_name(suggestion.industry_code)}"
+
+    # 呼叫 Meta API 建立完整廣告
+    service = MetaAudienceService(db)
+    from decimal import Decimal
+    creation_result = await service.create_complete_ad(
+        account_id=account.id,
+        ad_account_external_id=account.external_id,
+        campaign_id=request.campaign_id,
+        page_id=request.page_id,
+        targeting=targeting,
+        daily_budget=Decimal(str(request.daily_budget)),
+        link_url=request.link_url,
+        ad_copy=ad_copy,
+        adset_name=adset_name,
+        ad_name=ad_name,
+    )
+
+    if not creation_result.success:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Meta API 建立廣告失敗: {creation_result.error_message}",
+        )
 
     # 更新建議狀態
     suggestion.status = "executed"
-    suggestion.meta_adset_id = mock_adset_id
-    suggestion.meta_ad_id = mock_ad_id
+    suggestion.meta_audience_id = creation_result.audience_id
+    suggestion.meta_adset_id = creation_result.adset_id
+    suggestion.meta_ad_id = creation_result.ad_id
     suggestion.executed_at = datetime.now(timezone.utc)
     await db.flush()
 
     return CreateAdResponse(
         success=True,
         suggestion_id=suggestion_id,
-        meta_adset_id=mock_adset_id,
-        meta_ad_id=mock_ad_id,
+        meta_adset_id=creation_result.adset_id,
+        meta_ad_id=creation_result.ad_id,
         adset_name=adset_name,
         ad_name=ad_name,
         message="廣告已成功建立",

@@ -346,6 +346,7 @@ async def execute_recommendation(
     action_history = ActionHistoryDBModel(
         id=uuid.uuid4(),
         recommendation_id=rec_uuid,
+        ad_account_id=rec_record.ad_account_id,
         action_type="EXECUTE",
         target_type=rec_record.action_params.get("target_type", "unknown") if rec_record.action_params else "unknown",
         target_id=rec_record.action_params.get("target_id", str(rec_uuid)) if rec_record.action_params else str(rec_uuid),

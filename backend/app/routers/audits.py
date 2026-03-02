@@ -207,7 +207,7 @@ async def get_audit(
     result = await db.execute(
         select(HealthAudit)
         .options(selectinload(HealthAudit.issues))
-        .join(AdAccount, HealthAudit.account_id == AdAccount.id)
+        .join(AdAccount, HealthAudit.ad_account_id == AdAccount.id)
         .where(HealthAudit.id == audit_uuid)
         .where(AdAccount.user_id == current_user.id)
     )
@@ -265,7 +265,7 @@ async def get_audit_issues(
     # 驗證 audit 的所有權（確保用戶只能查看自己的 audit 問題）
     ownership_result = await db.execute(
         select(HealthAudit.id)
-        .join(AdAccount, HealthAudit.account_id == AdAccount.id)
+        .join(AdAccount, HealthAudit.ad_account_id == AdAccount.id)
         .where(HealthAudit.id == audit_uuid)
         .where(AdAccount.user_id == current_user.id)
     )
@@ -305,8 +305,8 @@ async def get_latest_audit(
     # 從資料庫取得最新健檢報告（同時驗證帳戶所有權）
     result = await db.execute(
         select(HealthAudit)
-        .join(AdAccount, HealthAudit.account_id == AdAccount.id)
-        .where(HealthAudit.account_id == account_uuid)
+        .join(AdAccount, HealthAudit.ad_account_id == AdAccount.id)
+        .where(HealthAudit.ad_account_id == account_uuid)
         .where(AdAccount.user_id == current_user.id)
         .order_by(HealthAudit.created_at.desc())
         .limit(1)
@@ -354,7 +354,7 @@ async def resolve_issue(
     result = await db.execute(
         select(AuditIssue)
         .join(HealthAudit, AuditIssue.audit_id == HealthAudit.id)
-        .join(AdAccount, HealthAudit.account_id == AdAccount.id)
+        .join(AdAccount, HealthAudit.ad_account_id == AdAccount.id)
         .where(
             AuditIssue.id == issue_uuid,
             AuditIssue.audit_id == audit_uuid,

@@ -30,7 +30,7 @@ from app.services.token_manager import TokenManager
 logger = logging.getLogger(__name__)
 
 # Meta Graph API 基底 URL
-META_GRAPH_URL = "https://graph.facebook.com/v18.0"
+META_GRAPH_URL = "https://graph.facebook.com/v24.0"
 
 
 # ============================================================
@@ -140,10 +140,19 @@ class MetaAudienceService:
         """
         url = f"{META_GRAPH_URL}/{endpoint}"
 
-        # 加入 access token
+        # 加入 access token 和 appsecret_proof
         if params is None:
             params = {}
         params["access_token"] = access_token
+
+        if self.settings.META_APP_SECRET:
+            import hashlib
+            import hmac
+            params["appsecret_proof"] = hmac.new(
+                self.settings.META_APP_SECRET.encode(),
+                access_token.encode(),
+                hashlib.sha256,
+            ).hexdigest()
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             if method.upper() == "GET":
@@ -835,3 +844,99 @@ class MetaAudienceService:
         except Exception as e:
             logger.error(f"取得預估觸及失敗: {e}")
             return None
+
+    # ============================================================
+    # 建立 Lookalike Audience
+    # ============================================================
+
+    async def create_lookalike_audience(
+        self,
+        account_id: uuid.UUID,
+        ad_account_external_id: str,
+        source_audience_id: str,
+        similarity_percentage: int,
+        target_country: str,
+        name: str,
+    ) -> AudienceCreationResult:
+        """
+        建立 Meta Lookalike Audience
+
+        Args:
+            account_id: 內部帳戶 ID
+            ad_account_external_id: Meta 廣告帳戶 ID（如 act_123456）
+            source_audience_id: 來源受眾的 external_id
+            similarity_percentage: 相似度百分比（1-10）
+            target_country: 目標國家碼（如 TW, US）
+            name: 受眾名稱
+
+        Returns:
+            AudienceCreationResult: 建立結果
+        """
+        access_token = await self._get_access_token(account_id)
+        if not access_token:
+            return AudienceCreationResult(
+                success=False,
+                error_message="無法取得有效的 access token",
+            )
+
+        # 確保帳戶 ID 格式正確
+        if not ad_account_external_id.startswith("act_"):
+            ad_account_external_id = f"act_{ad_account_external_id}"
+
+        # 驗證 similarity_percentage 範圍
+        if not 1 <= similarity_percentage <= 10:
+            return AudienceCreationResult(
+                success=False,
+                error_message="相似度百分比必須在 1-10 之間",
+            )
+
+        # 建構 lookalike_spec（ratio 是小數，1% = 0.01）
+        import json
+        lookalike_spec = json.dumps({
+            "type": "similarity",
+            "ratio": similarity_percentage / 100,
+            "country": target_country.upper(),
+        })
+
+        try:
+            response = await self._make_api_request(
+                "POST",
+                f"{ad_account_external_id}/customaudiences",
+                access_token,
+                data={
+                    "name": name,
+                    "subtype": "LOOKALIKE",
+                    "origin_audience_id": source_audience_id,
+                    "lookalike_spec": lookalike_spec,
+                },
+            )
+
+            audience_id = response.get("id")
+
+            if audience_id:
+                logger.info(f"成功建立 Lookalike Audience: {audience_id}")
+                return AudienceCreationResult(
+                    success=True,
+                    audience_id=audience_id,
+                    audience_name=name,
+                )
+            else:
+                return AudienceCreationResult(
+                    success=False,
+                    error_message="API 回應中缺少 audience ID",
+                )
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"Meta API 錯誤: {e.response.status_code} - {e.response.text}"
+            logger.error(error_msg)
+            return AudienceCreationResult(
+                success=False,
+                error_message=error_msg,
+            )
+        except Exception as e:
+            error_msg = f"建立 Lookalike 受眾失敗: {str(e)}"
+            logger.error(error_msg)
+            return AudienceCreationResult(
+                success=False,
+                error_message=error_msg,
+            )

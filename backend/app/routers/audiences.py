@@ -6,8 +6,10 @@
 - GET /audiences - 受眾列表
 - GET /audiences/:id - 受眾詳情
 - GET /audiences/overlap - 重疊分析
+- POST /audiences/{id}/create-lookalike - 建立 Lookalike 受眾
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -19,12 +21,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
+from app.middleware.auth import get_current_user
 from app.models import Audience as AudienceModel
+from app.models.ad_account import AdAccount
+from app.models.user import User
 from app.services.audience_health import (
     AudienceHealthInput,
     calculate_audience_health,
     get_audience_health_status,
 )
+from app.services.meta_audience_service import MetaAudienceService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -325,3 +333,123 @@ async def get_audience(
         raise HTTPException(status_code=404, detail="Audience not found")
 
     return _convert_db_audience_to_response(audience_record)
+
+
+# ============================================================
+# Lookalike Audience
+# ============================================================
+
+
+class CreateLookalikeRequest(BaseModel):
+    """建立 Lookalike 受眾請求"""
+
+    similarity_percentage: int = Field(
+        ..., ge=1, le=10, description="相似度百分比 (1-10)"
+    )
+    target_country: str = Field("TW", description="目標國家碼")
+    name: str = Field(..., description="受眾名稱")
+
+
+class CreateLookalikeResponse(BaseModel):
+    """建立 Lookalike 受眾回應"""
+
+    success: bool
+    audience_id: Optional[str] = None
+    source_audience_id: str
+    name: str
+    message: str
+
+
+@router.post(
+    "/{audience_id}/create-lookalike",
+    response_model=CreateLookalikeResponse,
+)
+async def create_lookalike_audience(
+    audience_id: str,
+    request: CreateLookalikeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CreateLookalikeResponse:
+    """
+    從現有受眾建立 Lookalike Audience
+
+    Args:
+        audience_id: 來源受眾 ID
+        request: 建立 Lookalike 請求
+        db: 資料庫 session
+
+    Returns:
+        CreateLookalikeResponse: 建立結果
+    """
+    # 驗證 ID
+    try:
+        audience_uuid = uuid.UUID(audience_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid audience ID format")
+
+    # 取得來源受眾
+    result = await db.execute(
+        select(AudienceModel).where(AudienceModel.id == audience_uuid)
+    )
+    source_audience = result.scalar_one_or_none()
+
+    if not source_audience:
+        raise HTTPException(status_code=404, detail="來源受眾不存在")
+
+    if not source_audience.external_id:
+        raise HTTPException(
+            status_code=400, detail="來源受眾缺少 Meta external_id"
+        )
+
+    # 取得對應的 Meta 廣告帳戶
+    account_result = await db.execute(
+        select(AdAccount).where(
+            AdAccount.id == source_audience.ad_account_id,
+            AdAccount.user_id == current_user.id,
+            AdAccount.platform == "meta",
+        )
+    )
+    account = account_result.scalar_one_or_none()
+
+    if not account or not account.access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="未找到已連結的 Meta 廣告帳戶，請先連結帳戶",
+        )
+
+    # 呼叫 Meta API 建立 Lookalike
+    service = MetaAudienceService(db)
+    creation_result = await service.create_lookalike_audience(
+        account_id=account.id,
+        ad_account_external_id=account.external_id,
+        source_audience_id=source_audience.external_id,
+        similarity_percentage=request.similarity_percentage,
+        target_country=request.target_country,
+        name=request.name,
+    )
+
+    if not creation_result.success:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Meta API 建立 Lookalike 失敗: {creation_result.error_message}",
+        )
+
+    # 建立本地 Audience 記錄
+    new_audience = AudienceModel(
+        id=uuid.uuid4(),
+        ad_account_id=account.id,
+        external_id=creation_result.audience_id or "",
+        name=request.name,
+        type="LOOKALIKE",
+        status="active",
+    )
+    db.add(new_audience)
+    await db.flush()
+
+    return CreateLookalikeResponse(
+        success=True,
+        audience_id=creation_result.audience_id,
+        source_audience_id=audience_id,
+        name=request.name,
+        message=f"Lookalike 受眾已成功建立（{request.similarity_percentage}% 相似度，{request.target_country}）",
+    )

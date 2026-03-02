@@ -197,7 +197,7 @@ async def get_latest_audit(
     if account_id:
         try:
             account_uuid = uuid.UUID(account_id)
-            query = query.where(HealthAuditModel.account_id == account_uuid)
+            query = query.where(HealthAuditModel.ad_account_id == account_uuid)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid account_id format")
 
