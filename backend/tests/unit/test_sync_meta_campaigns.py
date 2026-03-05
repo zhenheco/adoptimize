@@ -85,7 +85,7 @@ class TestSyncCampaigns:
 
             # 驗證資料庫
             db_campaigns = await db_session.execute(
-                select(Campaign).where(Campaign.account_id == test_ad_account.id)
+                select(Campaign).where(Campaign.ad_account_id == test_ad_account.id)
             )
             campaigns = list(db_campaigns.scalars().all())
 
@@ -105,7 +105,7 @@ class TestSyncCampaigns:
         # 先建立一筆既有的 campaign
         existing_campaign = Campaign(
             id=uuid.uuid4(),
-            account_id=test_ad_account.id,
+            ad_account_id=test_ad_account.id,
             external_id="camp_001",
             name="Old Name",
             status="PAUSED",
@@ -140,7 +140,7 @@ class TestSyncCampaigns:
             # 驗證沒有重複
             db_campaigns = await db_session.execute(
                 select(Campaign).where(
-                    Campaign.account_id == test_ad_account.id,
+                    Campaign.ad_account_id == test_ad_account.id,
                     Campaign.external_id == "camp_001",
                 )
             )
@@ -177,7 +177,7 @@ class TestSyncCampaigns:
 
             # 驗證全部存入
             db_campaigns = await db_session.execute(
-                select(Campaign).where(Campaign.account_id == test_ad_account.id)
+                select(Campaign).where(Campaign.ad_account_id == test_ad_account.id)
             )
             campaigns = list(db_campaigns.scalars().all())
             assert len(campaigns) == 150
@@ -202,8 +202,8 @@ class TestParseCampaignData:
         assert result["name"] == "Test Campaign"
         assert result["status"] == "ACTIVE"
         assert result["objective"] == "CONVERSIONS"
-        assert result["budget_type"] == "DAILY"
-        assert result["budget_amount"] == Decimal("100.00")  # 10000 / 100
+        assert result["budget_daily"] == Decimal("100.00")  # 10000 / 100
+        assert result["budget_lifetime"] is None
 
     def test_parse_campaign_data_lifetime_budget(self):
         """解析 lifetime budget"""
@@ -216,8 +216,8 @@ class TestParseCampaignData:
 
         result = _parse_campaign_data(raw_data)
 
-        assert result["budget_type"] == "LIFETIME"
-        assert result["budget_amount"] == Decimal("5000.00")
+        assert result["budget_daily"] is None
+        assert result["budget_lifetime"] == Decimal("5000.00")
 
     def test_parse_campaign_data_with_dates(self):
         """解析包含日期的 campaign"""
@@ -245,8 +245,8 @@ class TestParseCampaignData:
 
         assert result["external_id"] == "123456"
         assert result["name"] == "Minimal Campaign"
-        assert result["budget_type"] is None
-        assert result["budget_amount"] is None
+        assert result["budget_daily"] is None
+        assert result["budget_lifetime"] is None
 
 
 class TestSyncCampaignsTokenValidation:

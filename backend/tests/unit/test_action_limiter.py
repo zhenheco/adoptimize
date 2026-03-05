@@ -172,12 +172,16 @@ class TestIncrementActionCount:
 
     def test_increment_count_normally(self):
         """AC-AL2: 正常遞增計數"""
-        new_count, reset_date = increment_action_count(
-            current_count=5,
-            count_reset_at=date(2026, 1, 1),
-        )
+        with patch("app.services.action_limiter.date") as mock_date:
+            mock_date.today.return_value = date(2026, 1, 15)
+            mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
 
-        assert new_count == 6
+            new_count, reset_date = increment_action_count(
+                current_count=5,
+                count_reset_at=date(2026, 1, 1),
+            )
+
+            assert new_count == 6
 
     def test_increment_resets_and_starts_at_one(self):
         """AC-AL2: 跨月時重置並從 1 開始"""

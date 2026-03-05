@@ -51,7 +51,7 @@ class TestSyncAds:
         """建立測試用的 campaign"""
         campaign = Campaign(
             id=uuid.uuid4(),
-            account_id=test_ad_account.id,
+            ad_account_id=test_ad_account.id,
             external_id="camp_001",
             name="Test Campaign",
             status="ACTIVE",

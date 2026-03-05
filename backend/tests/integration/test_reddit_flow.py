@@ -66,7 +66,7 @@ class TestRedditOAuthFlow:
 
                 with patch("app.routers.oauth_reddit.TokenManager") as MockTokenManager:
                     mock_tm = MagicMock()
-                    mock_tm.save_new_account = AsyncMock(return_value=account_id)
+                    mock_tm.save_or_update_account = AsyncMock(return_value=(account_id, True, None))
                     MockTokenManager.return_value = mock_tm
 
                     result = await oauth_callback(

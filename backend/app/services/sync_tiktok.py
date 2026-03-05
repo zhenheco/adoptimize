@@ -87,7 +87,7 @@ class SyncTikTokService:
             # 查找或創建
             result = await self.db.execute(
                 select(Campaign).where(
-                    Campaign.account_id == account_id,
+                    Campaign.ad_account_id == account_id,
                     Campaign.external_id == external_id,
                 )
             )
@@ -101,7 +101,7 @@ class SyncTikTokService:
             else:
                 # 創建
                 campaign = Campaign(
-                    account_id=account_id,
+                    ad_account_id=account_id,
                     external_id=external_id,
                     name=camp_data.get("name", "Unknown Campaign"),
                     status=self._map_campaign_status(camp_data.get("status", "")),
@@ -138,7 +138,7 @@ class SyncTikTokService:
             # 找到對應的 campaign
             result = await self.db.execute(
                 select(Campaign).where(
-                    Campaign.account_id == account_id,
+                    Campaign.ad_account_id == account_id,
                     Campaign.external_id == campaign_external_id,
                 )
             )

@@ -106,6 +106,7 @@ class TestSyncTikTokCampaignsWithMock:
 
         # 設置 mock db session
         mock_db = AsyncMock()
+        mock_db.add = MagicMock()
 
         # 第一次查詢返回 account
         # 第二次查詢返回 None（campaign 不存在）
@@ -207,6 +208,7 @@ class TestSyncTikTokAdSetsWithMock:
 
         # 設置 mock db session
         mock_db = AsyncMock()
+        mock_db.add = MagicMock()
 
         # 第一次查詢返回 account
         # 第二次查詢返回 None（campaign 不存在）

@@ -51,7 +51,7 @@ class TestSyncAdSets:
         """建立測試用的 campaign"""
         campaign = Campaign(
             id=uuid.uuid4(),
-            account_id=test_ad_account.id,
+            ad_account_id=test_ad_account.id,
             external_id="camp_001",
             name="Test Campaign",
             status="ACTIVE",
@@ -216,8 +216,7 @@ class TestParseAdSetData:
         assert result["name"] == "Test Ad Set"
         assert result["status"] == "ACTIVE"
         assert result["campaign_external_id"] == "camp_001"
-        assert result["budget_type"] == "DAILY"
-        assert result["budget_amount"] == Decimal("50.00")
+        assert result["budget_daily"] == Decimal("50.00")
 
     def test_parse_adset_data_with_targeting(self):
         """解析包含 targeting 的 ad set"""

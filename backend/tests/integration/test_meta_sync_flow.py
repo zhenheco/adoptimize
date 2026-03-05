@@ -141,7 +141,7 @@ class TestFullSyncFlow:
         )
         campaign = camp_result.scalar_one()
         assert campaign.name == "Test Campaign 1"
-        assert campaign.account_id == test_ad_account.id
+        assert campaign.ad_account_id == test_ad_account.id
 
         # 取得 AdSet 並驗證關聯
         adset_result = await db_session.execute(

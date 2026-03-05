@@ -129,7 +129,7 @@ class LinkedInSyncService:
                     # 查找或創建
                     result = await self.db.execute(
                         select(Campaign).where(
-                            Campaign.account_id == self.account.id,
+                            Campaign.ad_account_id == self.account.id,
                             Campaign.external_id == external_id,
                         )
                     )
@@ -143,7 +143,7 @@ class LinkedInSyncService:
                     else:
                         # 創建
                         campaign = Campaign(
-                            account_id=self.account.id,
+                            ad_account_id=self.account.id,
                             external_id=external_id,
                             name=campaign_data.get("name", "Unknown Campaign"),
                             status=unified_status,
@@ -227,7 +227,7 @@ class LinkedInSyncService:
                     # 找到對應的 campaign
                     result = await self.db.execute(
                         select(Campaign).where(
-                            Campaign.account_id == self.account.id,
+                            Campaign.ad_account_id == self.account.id,
                             Campaign.external_id == campaign_external_id,
                         )
                     )

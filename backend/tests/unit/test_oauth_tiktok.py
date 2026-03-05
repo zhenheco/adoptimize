@@ -83,7 +83,7 @@ class TestOAuthCallback:
 
                 with patch("app.routers.oauth_tiktok.TokenManager") as mock_token_manager_class:
                     mock_token_manager = MagicMock()
-                    mock_token_manager.save_new_account = AsyncMock(return_value=mock_account_id)
+                    mock_token_manager.save_or_update_account = AsyncMock(return_value=(mock_account_id, True, None))
                     mock_token_manager_class.return_value = mock_token_manager
 
                     result = await oauth_callback(
