@@ -3,8 +3,8 @@ import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '廣告船長 - 跨平台廣告優化工具',
-  description: '整合 Google Ads 和 Meta Marketing API 的智慧廣告優化平台',
+  title: 'AdOptimize (廣告船長) - Cross-Platform Ad Optimization Tool',
+  description: 'AI-driven ad optimization platform integrating Google Ads and Meta Marketing APIs. 跨平台智慧廣告優化工具。',
 };
 
 export default function RootLayout({

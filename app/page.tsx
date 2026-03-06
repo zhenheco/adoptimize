@@ -225,6 +225,65 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* English Overview Section */}
+      <section className="relative z-10 py-12 px-6 bg-white/[0.02] border-y border-white/[0.05]">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-8 items-center">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-400" />
+                About AdOptimize
+              </h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                <strong>AdOptimize (廣告船長)</strong> is a comprehensive
+                cross-platform advertising management tool designed to help
+                businesses optimize their digital marketing performance. By
+                integrating with <strong>Google Ads API</strong> and{" "}
+                <strong>Meta Marketing API</strong>, we provide automated data
+                analysis, consolidated reporting, and AI-driven recommendations.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1" />
+                  <span className="text-xs text-slate-300">
+                    Consolidated cross-platform dashboard
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1" />
+                  <span className="text-xs text-slate-300">
+                    AI-powered budget & bid optimization
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1" />
+                  <span className="text-xs text-slate-300">
+                    Automated performance summaries
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-1" />
+                  <span className="text-xs text-slate-300">
+                    Privacy-first secure OAuth integration
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 max-w-sm">
+              <p className="font-semibold mb-2">
+                Google API Policy Compliance:
+              </p>
+              <p>
+                AdOptimize strictly adheres to Google API Services User Data
+                Policy. We only access necessary advertising performance data to
+                provide optimization services and do not share user data with
+                unauthorized third parties.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* === 故事場景區 === */}
       <div id="scenes">
         {/* Scene 1 - 早上 9 點：一眼看完所有平台 */}
@@ -679,7 +738,7 @@ export default function HomePage() {
             {/* 法律與支援 */}
             <div>
               <h4 className="font-semibold text-sm text-white mb-4">
-                法律與支援
+                法律與支援 / Support
               </h4>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li>
@@ -687,7 +746,7 @@ export default function HomePage() {
                     href="/privacy"
                     className="hover:text-slate-300 transition-colors"
                   >
-                    隱私政策
+                    Privacy Policy (隱私政策)
                   </Link>
                 </li>
                 <li>
@@ -695,7 +754,7 @@ export default function HomePage() {
                     href="/terms"
                     className="hover:text-slate-300 transition-colors"
                   >
-                    服務條款
+                    Terms of Service (服務條款)
                   </Link>
                 </li>
                 <li>
@@ -703,15 +762,22 @@ export default function HomePage() {
                     href="mailto:support@adoptimize.com"
                     className="hover:text-slate-300 transition-colors"
                   >
-                    聯絡我們
+                    Contact Us (聯絡我們)
                   </a>
+                </li>
+                <li className="pt-4 text-[10px] text-slate-600 leading-relaxed uppercase tracking-widest">
+                  AdOptimize Operations Team
+                  <br />
+                  7F., No. 123, Sec. 3, Nanjing E. Rd.,
+                  <br />
+                  Zhongshan Dist., Taipei City 104, Taiwan
                 </li>
               </ul>
             </div>
           </div>
 
           <div className="mt-10 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
-            <p>&copy; 2026 AdOptimize. All rights reserved.</p>
+            <p>&copy; 2026 AdOptimize (廣告船長). All rights reserved.</p>
             <p>
               遵守{" "}
               <a
