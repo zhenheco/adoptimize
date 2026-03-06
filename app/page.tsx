@@ -768,9 +768,9 @@ export default function HomePage() {
                 <li className="pt-4 text-[10px] text-slate-600 leading-relaxed uppercase tracking-widest">
                   AdOptimize Operations Team
                   <br />
-                  7F., No. 123, Sec. 3, Nanjing E. Rd.,
+                  No. 13, Zhengyi Rd., Guanxi Township,
                   <br />
-                  Zhongshan Dist., Taipei City 104, Taiwan
+                  Hsinchu County 306, Taiwan
                 </li>
               </ul>
             </div>

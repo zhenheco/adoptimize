@@ -1,10 +1,10 @@
-import { Metadata } from 'next';
-import Link from 'next/link';
+import { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: 'Terms of Service / 服務條款 - AdOptimize',
+  title: "Terms of Service / 服務條款 - AdOptimize",
   description:
-    'AdOptimize Terms of Service governing the use of our Google Ads and Meta Ads optimization platform.',
+    "AdOptimize Terms of Service governing the use of our Google Ads and Meta Ads optimization platform.",
 };
 
 export default function TermsPage() {
@@ -73,8 +73,8 @@ export default function TermsPage() {
                 </p>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>
-                    Integrate and analyze Google Ads and Meta advertising account
-                    data
+                    Integrate and analyze Google Ads and Meta advertising
+                    account data
                   </li>
                   <li>
                     Provide AI-driven optimization suggestions and action plans
@@ -189,12 +189,8 @@ export default function TermsPage() {
                   We are not responsible for any changes in advertising
                   performance resulting from following our suggestions
                 </li>
-                <li>
-                  We do not guarantee uninterrupted or error-free service
-                </li>
-                <li>
-                  Your use of the service is at your own risk
-                </li>
+                <li>We do not guarantee uninterrupted or error-free service</li>
+                <li>Your use of the service is at your own risk</li>
               </ul>
             </section>
 
@@ -240,7 +236,8 @@ export default function TermsPage() {
                 We reserve the right to modify these Terms of Service at any
                 time. For significant changes, we will notify you via email or
                 in-app notification. Your continued use of the service after
-                changes take effect constitutes acceptance of the modified terms.
+                changes take effect constitutes acceptance of the modified
+                terms.
               </p>
             </section>
 
@@ -265,7 +262,7 @@ export default function TermsPage() {
                   <strong>Entity:</strong> AdOptimize Operations Team
                 </p>
                 <p>
-                  <strong>Email:</strong>{' '}
+                  <strong>Email:</strong>{" "}
                   <a
                     href="mailto:support@adoptimize.com"
                     className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -274,8 +271,8 @@ export default function TermsPage() {
                   </a>
                 </p>
                 <p>
-                  <strong>Address:</strong> 7F., No. 123, Sec. 3, Nanjing E.
-                  Rd., Zhongshan Dist., Taipei City 104, Taiwan
+                  <strong>Address:</strong> No. 13, Zhengyi Rd., Guanxi
+                  Township, Hsinchu County 306, Taiwan
                 </p>
               </div>
             </section>
@@ -296,9 +293,7 @@ export default function TermsPage() {
                     AdOptimize（以下簡稱「本服務」）是一個跨平台廣告優化工具，提供以下功能：
                   </p>
                   <ul className="list-disc list-inside space-y-2">
-                    <li>
-                      整合並分析 Google Ads 和 Meta 廣告帳戶數據
-                    </li>
+                    <li>整合並分析 Google Ads 和 Meta 廣告帳戶數據</li>
                     <li>提供廣告優化建議和行動方案</li>
                     <li>監控廣告表現並發送異常通知</li>
                     <li>執行一鍵優化操作</li>
@@ -319,10 +314,7 @@ export default function TermsPage() {
                       2.1 註冊資格
                     </h4>
                     <ul className="mt-2 list-disc list-inside space-y-1">
-                      <li>
-                        您必須年滿 18
-                        歲或在您所在地區達到法定成年年齡
-                      </li>
+                      <li>您必須年滿 18 歲或在您所在地區達到法定成年年齡</li>
                       <li>您必須提供真實、準確的註冊資訊</li>
                       <li>每人僅能註冊一個帳戶</li>
                     </ul>
@@ -333,12 +325,8 @@ export default function TermsPage() {
                     </h4>
                     <ul className="mt-2 list-disc list-inside space-y-1">
                       <li>您有責任保護您的帳戶密碼安全</li>
-                      <li>
-                        您應立即通知我們任何未授權使用您帳戶的情況
-                      </li>
-                      <li>
-                        您對在您帳戶下發生的所有活動負責
-                      </li>
+                      <li>您應立即通知我們任何未授權使用您帳戶的情況</li>
+                      <li>您對在您帳戶下發生的所有活動負責</li>
                     </ul>
                   </div>
                   <div>
@@ -349,15 +337,9 @@ export default function TermsPage() {
                       當您連接 Google Ads 或 Meta 廣告帳戶時：
                     </p>
                     <ul className="mt-2 list-disc list-inside space-y-1">
-                      <li>
-                        您聲明您有權限授權本服務存取該廣告帳戶
-                      </li>
-                      <li>
-                        您同意遵守 Google 和 Meta 的服務條款
-                      </li>
-                      <li>
-                        您了解我們將依據您的授權讀取和分析廣告數據
-                      </li>
+                      <li>您聲明您有權限授權本服務存取該廣告帳戶</li>
+                      <li>您同意遵守 Google 和 Meta 的服務條款</li>
+                      <li>您了解我們將依據您的授權讀取和分析廣告數據</li>
                     </ul>
                   </div>
                 </div>
@@ -371,12 +353,8 @@ export default function TermsPage() {
                   <p>使用本服務時，您同意：</p>
                   <ul className="list-disc list-inside space-y-2">
                     <li>遵守所有適用的法律法規</li>
-                    <li>
-                      不使用本服務進行任何非法或未授權的活動
-                    </li>
-                    <li>
-                      不嘗試破解、干擾或破壞本服務的運作
-                    </li>
+                    <li>不使用本服務進行任何非法或未授權的活動</li>
+                    <li>不嘗試破解、干擾或破壞本服務的運作</li>
                     <li>
                       不使用自動化工具（如機器人、爬蟲）存取本服務，除非經過我們書面授權
                     </li>
@@ -410,18 +388,10 @@ export default function TermsPage() {
                     </p>
                   </div>
                   <ul className="list-disc list-inside space-y-2">
-                    <li>
-                      我們不保證本服務的優化建議必然帶來預期的廣告效果
-                    </li>
-                    <li>
-                      我們不對因您採納建議而導致的任何廣告表現變化負責
-                    </li>
-                    <li>
-                      我們不保證服務不會中斷或完全沒有錯誤
-                    </li>
-                    <li>
-                      您使用本服務的風險由您自行承擔
-                    </li>
+                    <li>我們不保證本服務的優化建議必然帶來預期的廣告效果</li>
+                    <li>我們不對因您採納建議而導致的任何廣告表現變化負責</li>
+                    <li>我們不保證服務不會中斷或完全沒有錯誤</li>
+                    <li>您使用本服務的風險由您自行承擔</li>
                   </ul>
                 </div>
               </section>
@@ -479,15 +449,13 @@ export default function TermsPage() {
                   10. 聯絡我們
                 </h3>
                 <div className="text-gray-700 dark:text-gray-300">
-                  <p>
-                    如果您對本服務條款有任何疑問，請聯絡：
-                  </p>
+                  <p>如果您對本服務條款有任何疑問，請聯絡：</p>
                   <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <p>
                       <strong>Entity:</strong> AdOptimize Operations Team
                     </p>
                     <p>
-                      <strong>Email:</strong>{' '}
+                      <strong>Email:</strong>{" "}
                       <a
                         href="mailto:support@adoptimize.com"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -496,8 +464,8 @@ export default function TermsPage() {
                       </a>
                     </p>
                     <p>
-                      <strong>Address:</strong> 7F., No. 123, Sec. 3, Nanjing
-                      E. Rd., Zhongshan Dist., Taipei City 104, Taiwan
+                      <strong>Address:</strong> No. 13, Zhengyi Rd., Guanxi
+                      Township, Hsinchu County 306, Taiwan
                     </p>
                   </div>
                 </div>

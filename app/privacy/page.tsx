@@ -1,10 +1,10 @@
-import { Metadata } from 'next';
-import Link from 'next/link';
+import { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy / 隱私政策 - AdOptimize',
+  title: "Privacy Policy / 隱私政策 - AdOptimize",
   description:
-    'AdOptimize Privacy Policy including data collection, Google API usage, and user rights.',
+    "AdOptimize Privacy Policy including data collection, Google API usage, and user rights.",
 };
 
 export default function PrivacyPage() {
@@ -56,8 +56,8 @@ export default function PrivacyPage() {
                 Privacy Policy (English)
               </h2>
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                AdOptimize (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is
-                committed to protecting your privacy. This Privacy Policy
+                AdOptimize (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
+                is committed to protecting your privacy. This Privacy Policy
                 explains how we collect, use, and safeguard your information
                 when you use our cross-platform advertising optimization
                 service, which integrates with Google Ads and Meta
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
               </h3>
               <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
                 AdOptimize&apos;s use and transfer to any other app of
-                information received from Google APIs will adhere to the{' '}
+                information received from Google APIs will adhere to the{" "}
                 <a
                   href="https://developers.google.com/terms/api-services-user-data-policy"
                   target="_blank"
@@ -165,9 +165,7 @@ export default function PrivacyPage() {
                 <ul className="list-disc list-inside space-y-1 ml-4">
                   <li>Sell or rent your personal data or Google User Data</li>
                   <li>Use Google User Data to serve you ads</li>
-                  <li>
-                    Share Google User Data with unrelated third parties
-                  </li>
+                  <li>Share Google User Data with unrelated third parties</li>
                   <li>
                     Allow human reading of Google User Data without your
                     explicit consent, except for security purposes, legal
@@ -264,7 +262,7 @@ export default function PrivacyPage() {
                   <strong>Entity:</strong> AdOptimize Operations Team
                 </p>
                 <p>
-                  <strong>Email:</strong>{' '}
+                  <strong>Email:</strong>{" "}
                   <a
                     href="mailto:privacy@adoptimize.com"
                     className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -273,8 +271,8 @@ export default function PrivacyPage() {
                   </a>
                 </p>
                 <p>
-                  <strong>Address:</strong> 7F., No. 123, Sec. 3, Nanjing E.
-                  Rd., Zhongshan Dist., Taipei City 104, Taiwan
+                  <strong>Address:</strong> No. 13, Zhengyi Rd., Guanxi
+                  Township, Hsinchu County 306, Taiwan
                 </p>
               </div>
             </section>
@@ -303,7 +301,7 @@ export default function PrivacyPage() {
                   Google API 資料使用聲明（有限使用政策）
                 </h3>
                 <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
-                  AdOptimize 使用從 Google API 接收到的資訊將遵守{' '}
+                  AdOptimize 使用從 Google API 接收到的資訊將遵守{" "}
                   <a
                     href="https://developers.google.com/terms/api-services-user-data-policy"
                     target="_blank"
@@ -342,9 +340,7 @@ export default function PrivacyPage() {
                     </p>
                     <ul className="mt-2 list-disc list-inside space-y-1">
                       <li>廣告帳戶基本資訊（帳戶 ID、名稱）</li>
-                      <li>
-                        廣告活動數據（曝光數、點擊數、轉換數、花費）
-                      </li>
+                      <li>廣告活動數據（曝光數、點擊數、轉換數、花費）</li>
                       <li>素材資訊（廣告創意、圖片、文案）</li>
                       <li>受眾設定（目標對象、投放設定）</li>
                       <li>帳戶表現指標</li>
@@ -402,19 +398,14 @@ export default function PrivacyPage() {
                   <p>我們採取業界標準的安全措施來保護您的資料：</p>
                   <ul className="list-disc list-inside space-y-2">
                     <li>所有資料傳輸使用 TLS/SSL 加密</li>
-                    <li>
-                      敏感資料（如 OAuth tokens）使用 AES-256 加密儲存
-                    </li>
-                    <li>
-                      資料庫存放於具有嚴格存取控制的雲端環境
-                    </li>
+                    <li>敏感資料（如 OAuth tokens）使用 AES-256 加密儲存</li>
+                    <li>資料庫存放於具有嚴格存取控制的雲端環境</li>
                     <li>定期進行安全審計和漏洞掃描</li>
                   </ul>
                   <p className="mt-4">
                     <strong>資料保留期限：</strong>
                     我們會在您使用服務期間保留您的資料。如果您刪除帳戶，我們會在
-                    30
-                    天內刪除您的個人資料，除非法律要求保留更長時間。
+                    30 天內刪除您的個人資料，除非法律要求保留更長時間。
                   </p>
                 </div>
               </section>
@@ -431,7 +422,7 @@ export default function PrivacyPage() {
                         Google Ads API
                       </h4>
                       <p className="mt-1 text-sm">
-                        用於讀取和分析您的 Google 廣告數據。我們遵守{' '}
+                        用於讀取和分析您的 Google 廣告數據。我們遵守{" "}
                         <a
                           href="https://developers.google.com/terms/api-services-user-data-policy"
                           target="_blank"
@@ -449,7 +440,7 @@ export default function PrivacyPage() {
                       </h4>
                       <p className="mt-1 text-sm">
                         用於讀取和分析您的
-                        Meta（Facebook/Instagram）廣告數據。我們遵守{' '}
+                        Meta（Facebook/Instagram）廣告數據。我們遵守{" "}
                         <a
                           href="https://developers.facebook.com/terms/"
                           target="_blank"
@@ -458,7 +449,7 @@ export default function PrivacyPage() {
                         >
                           Meta 平台條款
                         </a>
-                        和{' '}
+                        和{" "}
                         <a
                           href="https://developers.facebook.com/devpolicy/"
                           target="_blank"
@@ -481,8 +472,7 @@ export default function PrivacyPage() {
                 <div className="space-y-4 text-gray-700 dark:text-gray-300">
                   <p>
                     <strong>
-                      我們不會出售您的個人資料或 Google
-                      用戶資料給任何第三方。
+                      我們不會出售您的個人資料或 Google 用戶資料給任何第三方。
                     </strong>
                   </p>
                   <p>
@@ -490,15 +480,10 @@ export default function PrivacyPage() {
                   </p>
                   <p>我們不會進行的行為：</p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li>出售或出租您的個人資料或 Google 用戶資料</li>
+                    <li>將 Google 用戶資料用於向您投放廣告</li>
                     <li>
-                      出售或出租您的個人資料或 Google 用戶資料
-                    </li>
-                    <li>
-                      將 Google 用戶資料用於向您投放廣告
-                    </li>
-                    <li>
-                      將 Google
-                      用戶資料分享給與提供或改進本服務無關的第三方
+                      將 Google 用戶資料分享給與提供或改進本服務無關的第三方
                     </li>
                     <li>
                       允許人工讀取 Google
@@ -520,8 +505,8 @@ export default function PrivacyPage() {
                     <li>分析服務使用情況</li>
                   </ul>
                   <p className="mt-4">
-                    您可以透過瀏覽器設定管理 Cookie。但請注意，停用某些
-                    Cookie 可能會影響服務的功能。
+                    您可以透過瀏覽器設定管理 Cookie。但請注意，停用某些 Cookie
+                    可能會影響服務的功能。
                   </p>
                 </div>
               </section>
@@ -531,9 +516,7 @@ export default function PrivacyPage() {
                   8. 您的權利
                 </h3>
                 <div className="space-y-4 text-gray-700 dark:text-gray-300">
-                  <p>
-                    根據適用的隱私法規，您享有以下權利：
-                  </p>
+                  <p>根據適用的隱私法規，您享有以下權利：</p>
                   <ul className="list-disc list-inside space-y-2">
                     <li>
                       <strong>存取權：</strong>
@@ -585,7 +568,7 @@ export default function PrivacyPage() {
                       <strong>Entity:</strong> AdOptimize Operations Team
                     </p>
                     <p>
-                      <strong>Email:</strong>{' '}
+                      <strong>Email:</strong>{" "}
                       <a
                         href="mailto:privacy@adoptimize.com"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -594,8 +577,8 @@ export default function PrivacyPage() {
                       </a>
                     </p>
                     <p>
-                      <strong>Address:</strong> 7F., No. 123, Sec. 3, Nanjing
-                      E. Rd., Zhongshan Dist., Taipei City 104, Taiwan
+                      <strong>Address:</strong> No. 13, Zhengyi Rd., Guanxi
+                      Township, Hsinchu County 306, Taiwan
                     </p>
                   </div>
                 </div>
