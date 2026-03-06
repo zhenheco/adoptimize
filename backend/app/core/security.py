@@ -10,7 +10,8 @@ from typing import Any
 
 import bcrypt
 import jwt
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from jwt.exceptions import DecodeError, ExpiredSignatureError
+from jwt.exceptions import InvalidTokenError as JWTInvalidTokenError
 
 from app.core.config import get_settings
 
@@ -161,7 +162,7 @@ def verify_token(token: str, expected_type: str = "access") -> dict[str, Any] | 
         if payload.get("type") != expected_type:
             return None
         return payload
-    except (ExpiredSignatureError, InvalidTokenError):
+    except (ExpiredSignatureError, JWTInvalidTokenError, DecodeError):
         return None
 
 

@@ -4,6 +4,7 @@ SQLAlchemy 資料庫基礎設定
 """
 
 import logging
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -13,9 +14,13 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# 嘗試建立非同步引擎
-# 注意：Supabase 使用 pgbouncer（transaction mode），需要禁用 prepared statement cache
+# Supabase pgbouncer（transaction mode）需要禁用 prepared statement cache，
 # 否則會出現「prepared statement does not exist」錯誤
+PGBOUNCER_CONNECT_ARGS = {
+    "statement_cache_size": 0,
+    "prepared_statement_cache_size": 0,
+}
+
 try:
     engine = create_async_engine(
         settings.DATABASE_URL,
@@ -23,13 +28,9 @@ try:
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,
-        connect_args={
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        },
+        connect_args=PGBOUNCER_CONNECT_ARGS,
     )
 
-    # 建立非同步 Session 工廠
     async_session_maker = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,
@@ -48,6 +49,11 @@ except Exception as e:
 class Base(DeclarativeBase):
     """SQLAlchemy ORM 基礎類別"""
 
+    pass
+
+
+class DatabaseUnavailableError(Exception):
+    """資料庫不可用異常"""
     pass
 
 
@@ -76,11 +82,6 @@ class MockAsyncSession:
         pass
 
 
-class DatabaseUnavailableError(Exception):
-    """資料庫不可用異常"""
-    pass
-
-
 def create_worker_session_maker():
     """
     為 Celery Worker 創建新的 session maker
@@ -94,10 +95,7 @@ def create_worker_session_maker():
         pool_pre_ping=True,
         pool_size=2,
         max_overflow=3,
-        connect_args={
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        },
+        connect_args=PGBOUNCER_CONNECT_ARGS,
     )
     return async_sessionmaker(
         bind=worker_engine,
@@ -108,7 +106,7 @@ def create_worker_session_maker():
     )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     依賴注入：取得資料庫 Session
     使用方式：db: AsyncSession = Depends(get_db)
@@ -136,7 +134,13 @@ async def get_db() -> AsyncSession:
         yield session
         await session.commit()
     except Exception:
-        await session.rollback()
+        try:
+            await session.rollback()
+        except Exception as rollback_err:
+            logger.warning(f"Session rollback failed: {rollback_err}")
         raise
     finally:
-        await session.close()
+        try:
+            await session.close()
+        except Exception as close_err:
+            logger.warning(f"Session close failed: {close_err}")

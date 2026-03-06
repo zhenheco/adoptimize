@@ -3,9 +3,9 @@
 AdOptimize FastAPI 應用程式入口點
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,7 @@ from app.core.logger import get_logger, setup_logging as setup_app_logging
 from app.core.scheduler import setup_scheduler, shutdown_scheduler
 from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.routers import api_router
+from app.services.redis_client import get_redis_client
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -30,8 +31,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging(level=settings.LOG_LEVEL)
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
-    # 初始化 Redis 連線
-    from app.services.redis_client import get_redis_client
     redis_client = get_redis_client()
     try:
         await redis_client.connect()
@@ -45,8 +44,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     shutdown_scheduler()
     try:
         await redis_client.disconnect()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Redis disconnect failed: {e}")
     logger.info(f"Shutting down {settings.APP_NAME}")
 
 
@@ -58,6 +57,7 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
     openapi_url="/openapi.json" if settings.DEBUG else None,
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS 中間件設定
