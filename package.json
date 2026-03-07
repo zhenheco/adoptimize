@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cf": "npx opennextjs-cloudflare build",
+    "preview:cf": "npx opennextjs-cloudflare preview",
+    "deploy:cf": "npx opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
@@ -32,6 +35,7 @@
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.17.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^20.17.10",

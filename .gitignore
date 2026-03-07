@@ -49,6 +49,8 @@ build/
 out/
 .next/
 .open-next/
+.wrangler/
+.dev.vars
 
 # IDE
 .idea/
