@@ -9,3 +9,4 @@ binding = "ASSETS"
 
 [vars]
 ENVIRONMENT = "production"
+PYTHON_API_URL = "https://adoptimize-api.fly.dev"
