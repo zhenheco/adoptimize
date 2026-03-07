@@ -7,6 +7,10 @@ compatibility_flags = ["nodejs_compat"]
 directory = ".open-next/assets"
 binding = "ASSETS"
 
+[[routes]]
+pattern = "adoptimize.1wayseo.com"
+custom_domain = true
+
 [vars]
 ENVIRONMENT = "production"
 PYTHON_API_URL = "https://adoptimize-api.fly.dev"
