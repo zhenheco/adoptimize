@@ -2,6 +2,11 @@
 """
 APScheduler 定時任務管理
 
+DEPRECATED: APScheduler 將由 Cloudflare Workers Cron Triggers 替代。
+新的觸發方式：CF Cron Worker → HTTP POST → /api/v1/cron/{job-name}
+參見 cron-worker/ 目錄和 routers/cron_triggers.py。
+APScheduler 目前保留作為 fallback，預計在 CF Cron 穩定運行 2 週後移除。
+
 排程（MVP：僅 Google + Meta）：
 - 每 10 分鐘：Meta Ads 數據同步
 - 每 15 分鐘：Google Ads 數據同步

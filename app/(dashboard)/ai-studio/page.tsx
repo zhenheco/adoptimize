@@ -1,26 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Image, Copy, RefreshCw, Lock, Check } from 'lucide-react';
 import { useAICopywriting, type Platform, type AllPlatformResult, type GoogleAdsResult, type MetaAdsResult } from '@/hooks/use-ai-copywriting';
 
-// 平台選項
-const PLATFORMS: { value: Platform; label: string; description: string }[] = [
-  { value: 'all', label: '全平台', description: 'Google + Meta' },
-  { value: 'google', label: 'Google Ads', description: 'RSA 響應式搜尋廣告' },
-  { value: 'meta', label: 'Meta Ads', description: 'Facebook / Instagram' },
-];
-
-// 風格選項
-const STYLES = [
-  { value: 'professional', label: '專業', emoji: '💼' },
-  { value: 'casual', label: '輕鬆', emoji: '😊' },
-  { value: 'urgent', label: '緊迫', emoji: '⚡' },
-  { value: 'friendly', label: '親切', emoji: '🤝' },
-  { value: 'luxury', label: '高端', emoji: '✨' },
-  { value: 'playful', label: '活潑', emoji: '🎉' },
-];
+// Style values (labels resolved inside component with i18n)
+const STYLE_VALUES = ['professional', 'casual', 'urgent', 'friendly', 'luxury', 'playful'] as const;
+const STYLE_EMOJIS: Record<string, string> = {
+  professional: '💼',
+  casual: '😊',
+  urgent: '⚡',
+  friendly: '🤝',
+  luxury: '✨',
+  playful: '🎉',
+};
 
 interface GeneratedCopy {
   id: string;
@@ -82,6 +77,7 @@ function CopyItem({ text, charLimit }: { text: string; charLimit?: number }) {
 
 // Google Ads 結果元件
 function GoogleAdsResults({ result }: { result: GoogleAdsResult }) {
+  const t = useTranslations('aiStudio');
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -94,8 +90,8 @@ function GoogleAdsResults({ result }: { result: GoogleAdsResult }) {
 
       <div>
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          標題（{result.headlines.length} 個）
-          <span className="text-gray-400 ml-2">限 30 字元</span>
+          {t('headlines', { count: result.headlines.length })}
+          <span className="text-gray-400 ml-2">{t('headlinesLimit', { limit: 30 })}</span>
         </h4>
         {result.headlines.map((headline, i) => (
           <CopyItem key={i} text={headline} charLimit={30} />
@@ -104,8 +100,8 @@ function GoogleAdsResults({ result }: { result: GoogleAdsResult }) {
 
       <div>
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          描述（{result.descriptions.length} 個）
-          <span className="text-gray-400 ml-2">限 90 字元</span>
+          {t('descriptions', { count: result.descriptions.length })}
+          <span className="text-gray-400 ml-2">{t('descriptionsLimit', { limit: 90 })}</span>
         </h4>
         {result.descriptions.map((desc, i) => (
           <CopyItem key={i} text={desc} charLimit={90} />
@@ -117,6 +113,7 @@ function GoogleAdsResults({ result }: { result: GoogleAdsResult }) {
 
 // Meta Ads 結果元件
 function MetaAdsResults({ result }: { result: MetaAdsResult }) {
+  const t = useTranslations('aiStudio');
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -130,8 +127,8 @@ function MetaAdsResults({ result }: { result: MetaAdsResult }) {
       {result.primary_texts && result.primary_texts.length > 0 && (
         <div>
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            主要文案（{result.primary_texts.length} 個）
-            <span className="text-gray-400 ml-2">建議 125 字元內</span>
+            {t('primaryTexts', { count: result.primary_texts.length })}
+            <span className="text-gray-400 ml-2">{t('primaryTextsLimit', { limit: 125 })}</span>
           </h4>
           {result.primary_texts.map((text, i) => (
             <CopyItem key={i} text={text} charLimit={125} />
@@ -141,8 +138,8 @@ function MetaAdsResults({ result }: { result: MetaAdsResult }) {
 
       <div>
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          標題（{result.headlines.length} 個）
-          <span className="text-gray-400 ml-2">限 27 字元</span>
+          {t('headlines', { count: result.headlines.length })}
+          <span className="text-gray-400 ml-2">{t('headlinesLimit', { limit: 27 })}</span>
         </h4>
         {result.headlines.map((headline, i) => (
           <CopyItem key={i} text={headline} charLimit={27} />
@@ -151,8 +148,8 @@ function MetaAdsResults({ result }: { result: MetaAdsResult }) {
 
       <div>
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          描述（{result.descriptions.length} 個）
-          <span className="text-gray-400 ml-2">限 30 字元</span>
+          {t('descriptions', { count: result.descriptions.length })}
+          <span className="text-gray-400 ml-2">{t('descriptionsLimit', { limit: 30 })}</span>
         </h4>
         {result.descriptions.map((desc, i) => (
           <CopyItem key={i} text={desc} charLimit={30} />
@@ -163,6 +160,8 @@ function MetaAdsResults({ result }: { result: MetaAdsResult }) {
 }
 
 export default function AIStudioPage() {
+  const t = useTranslations('aiStudio');
+  const tc = useTranslations('common');
   const [productDescription, setProductDescription] = useState('');
   const [platform, setPlatform] = useState<Platform>('all');
   const [style, setStyle] = useState('professional');
@@ -171,6 +170,18 @@ export default function AIStudioPage() {
   const usageLimit = 20;
 
   const { generate, isLoading: isGenerating, error } = useAICopywriting();
+
+  const PLATFORMS: { value: Platform; label: string; description: string }[] = [
+    { value: 'all', label: t('allPlatforms'), description: t('allPlatformsDesc') },
+    { value: 'google', label: 'Google Ads', description: t('googleAdsDesc') },
+    { value: 'meta', label: 'Meta Ads', description: t('metaAdsDesc') },
+  ];
+
+  const STYLES = STYLE_VALUES.map((value) => ({
+    value,
+    label: t(value),
+    emoji: STYLE_EMOJIS[value],
+  }));
 
   const handleGenerate = async () => {
     if (!productDescription.trim()) return;
@@ -197,10 +208,10 @@ export default function AIStudioPage() {
       {/* 頁面標題 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          ✨ AI 創作
+          ✨ {t('title')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          讓 AI 幫你生成廣告文案和素材
+          {t('subtitle')}
         </p>
       </div>
 
@@ -214,17 +225,17 @@ export default function AIStudioPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
-                文案生成
+                {t('copywriting')}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                讓 AI 幫你寫廣告標題和描述
+                {t('copywritingDesc')}
               </p>
             </div>
           </div>
 
           <div className="mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-              本月已用：{usageCount}/{usageLimit} 組
+              {t('monthlyUsage', { used: usageCount, limit: usageLimit })}
             </p>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
@@ -237,7 +248,7 @@ export default function AIStudioPage() {
           {/* 平台選擇 */}
           <div className="mb-4">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              目標平台
+              {t('targetPlatform')}
             </label>
             <div className="flex gap-2">
               {PLATFORMS.map((p) => (
@@ -262,7 +273,7 @@ export default function AIStudioPage() {
           {/* 風格選擇 */}
           <div className="mb-4">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              文案風格
+              {t('copyStyle')}
             </label>
             <div className="flex flex-wrap gap-2">
               {STYLES.map((s) => (
@@ -284,7 +295,7 @@ export default function AIStudioPage() {
           <textarea
             value={productDescription}
             onChange={(e) => setProductDescription(e.target.value)}
-            placeholder="描述你的商品或服務...&#10;例如：手工皂禮盒，天然植物萃取，適合送禮&#10;&#10;提示：描述越詳細，生成的文案越精準！"
+            placeholder={t('inputPlaceholder')}
             className="w-full h-32 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none mb-4"
           />
 
@@ -296,12 +307,12 @@ export default function AIStudioPage() {
             {isGenerating ? (
               <>
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                生成中...
+                {t('generating')}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                開始生成
+                {t('startGenerate')}
               </>
             )}
           </Button>
@@ -315,13 +326,13 @@ export default function AIStudioPage() {
                 <Lock className="w-6 h-6 text-gray-400" />
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                升級解鎖
+                {t('upgradeUnlock')}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                素材包 +$1,990/月
+                {t('imageAddon')}
               </p>
               <Button variant="outline" size="sm">
-                了解更多
+                {tc('learnMore')}
               </Button>
             </div>
           </div>
@@ -332,16 +343,16 @@ export default function AIStudioPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
-                圖片生成
+                {t('imageGeneration')}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                讓 AI 幫你做廣告圖片
+                {t('imageGenerationDesc')}
               </p>
             </div>
           </div>
 
           <p className="text-gray-500 dark:text-gray-400">
-            10 張/月
+            {t('imagesPerMonth')}
           </p>
         </div>
       </div>
@@ -350,7 +361,7 @@ export default function AIStudioPage() {
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-600 dark:text-red-400">
-            生成失敗：{error.message}
+            {t('generationFailed', { error: error.message })}
           </p>
         </div>
       )}
@@ -360,11 +371,11 @@ export default function AIStudioPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              🎯 生成結果
+              🎯 {t('generatedResult')}
             </h2>
             <Button variant="outline" size="sm" onClick={handleGenerate} disabled={isGenerating}>
               <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
-              重新生成
+              {t('regenerate')}
             </Button>
           </div>
 
@@ -386,12 +397,12 @@ export default function AIStudioPage() {
       {/* 歷史記錄 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          📋 最近生成的內容
+          📋 {t('recentGenerated')}
         </h2>
 
         {mockHistory.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
-            尚無生成記錄
+            {t('noHistory')}
           </p>
         ) : (
           <div className="space-y-4">
@@ -406,7 +417,7 @@ export default function AIStudioPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
-                  標題：{item.headlines[0]}
+                  {t('headlineLabel', { text: item.headlines[0] })}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {item.descriptions[0].slice(0, 50)}...

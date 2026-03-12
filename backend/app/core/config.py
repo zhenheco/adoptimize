@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     CF_AI_GATEWAY_TOKEN: Optional[str] = None
     CF_AI_GATEWAY_ENABLED: bool = False
 
+    # CF Cron Worker 驗證密鑰
+    CRON_SECRET: Optional[str] = None
+
     @property
     def cors_origins(self) -> list[str]:
         """取得 CORS origins 列表，支援逗號分隔字串格式"""

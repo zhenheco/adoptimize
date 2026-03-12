@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { FileText, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
@@ -45,12 +46,6 @@ const mockReports: Report[] = [
   },
 ];
 
-const typeLabels = {
-  daily: '每日摘要',
-  weekly: '週報',
-  monthly: '月報',
-};
-
 const typeColors = {
   daily: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   weekly: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -58,10 +53,18 @@ const typeColors = {
 };
 
 export default function ReportsPage() {
+  const t = useTranslations('reports');
+  const tc = useTranslations('common');
   const [reports, setReports] = useState<Report[]>(mockReports);
   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isUsingMockData, setIsUsingMockData] = useState(false);
+
+  const typeLabels = {
+    daily: t('daily'),
+    weekly: t('weekly'),
+    monthly: t('monthly'),
+  };
 
   // 從 API 載入報告，失敗時使用 mock data
   useEffect(() => {
@@ -108,26 +111,26 @@ export default function ReportsPage() {
       {/* 頁面標題 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          📊 報告
+          📊 {t('title')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          查看週報和月報，了解廣告表現
+          {t('subtitle')}
         </p>
       </div>
 
       {/* 使用展示資料提示 */}
       {isUsingMockData && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
-          目前顯示的是展示資料。連接廣告帳號後將顯示真實報告。
+          {tc('mockReportsNotice')}
         </div>
       )}
 
       {/* 篩選器 */}
       <div className="flex gap-2">
         {[
-          { value: 'all', label: '全部' },
-          { value: 'weekly', label: '週報' },
-          { value: 'monthly', label: '月報' },
+          { value: 'all', label: t('all') },
+          { value: 'weekly', label: t('weekly') },
+          { value: 'monthly', label: t('monthly') },
         ].map((option) => (
           <Button
             key={option.value}
@@ -146,7 +149,7 @@ export default function ReportsPage() {
           <div className="p-8 text-center">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-500 dark:text-gray-400">
-              尚無報告
+              {t('noReports')}
             </p>
           </div>
         ) : (
@@ -171,9 +174,9 @@ export default function ReportsPage() {
                         {formatPeriod(report)}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        花費 ${report.summary.spend.toLocaleString()} ・
-                        訂單 {report.summary.conversions} 筆 ・
-                        投報率 {report.summary.roas.toFixed(1)} 倍
+                        {t('spendLabel', { amount: report.summary.spend.toLocaleString() })} ・
+                        {t('ordersLabel', { count: report.summary.conversions })} ・
+                        {t('roasLabel', { value: report.summary.roas.toFixed(1) })}
                       </p>
                     </div>
                   </div>
@@ -208,7 +211,7 @@ export default function ReportsPage() {
                   size="sm"
                   onClick={() => setSelectedReport(null)}
                 >
-                  關閉
+                  {tc('close')}
                 </Button>
               </div>
 
@@ -218,7 +221,7 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      💰 花費
+                      {t('spendEmoji')}
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       ${selectedReport.summary.spend.toLocaleString()}
@@ -226,18 +229,18 @@ export default function ReportsPage() {
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      📦 訂單
+                      {t('ordersEmoji')}
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {selectedReport.summary.conversions} 筆
+                      {t('ordersUnit', { count: selectedReport.summary.conversions })}
                     </p>
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      📈 投報率
+                      {t('roasEmoji')}
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {selectedReport.summary.roas.toFixed(1)} 倍
+                      {t('roasUnit', { value: selectedReport.summary.roas.toFixed(1) })}
                     </p>
                   </div>
                 </div>
@@ -245,18 +248,13 @@ export default function ReportsPage() {
                 {/* 白話報告 */}
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-gray-900 dark:text-white leading-relaxed">
-                    這{selectedReport.type === 'weekly' ? '週' : '個月'}花了 $
-                    {selectedReport.summary.spend.toLocaleString()}，帶來{' '}
-                    {selectedReport.summary.conversions} 筆訂單 📦
+                    {selectedReport.type === 'weekly'
+                      ? t('weeklyNarrative', { spend: selectedReport.summary.spend.toLocaleString(), conversions: selectedReport.summary.conversions })
+                      : t('monthlyNarrative', { spend: selectedReport.summary.spend.toLocaleString(), conversions: selectedReport.summary.conversions })} 📦
                     <br />
                     <br />
-                    每筆訂單成本 $
-                    {Math.round(
-                      selectedReport.summary.spend /
-                        selectedReport.summary.conversions
-                    ).toLocaleString()}
-                    ，投報率 {selectedReport.summary.roas.toFixed(1)} 倍，表現
-                    {selectedReport.summary.roas >= 3 ? '不錯' : '還可以'}！
+                    {t('costPerOrder', { cost: Math.round(selectedReport.summary.spend / selectedReport.summary.conversions).toLocaleString() })}
+                    ，{t('performanceRoas', { value: selectedReport.summary.roas.toFixed(1), performance: selectedReport.summary.roas >= 3 ? t('performanceGood') : t('performanceOk') })}
                   </p>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Zap,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface Transaction {
   id: string;
@@ -34,49 +35,49 @@ interface TransactionListProps {
  * 交易類型配置
  */
 const TRANSACTION_CONFIG: Record<string, {
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
 }> = {
   deposit: {
-    label: '儲值',
+    labelKey: 'txDeposit',
     icon: <ArrowDownLeft className="w-4 h-4" />,
     color: 'text-green-600 dark:text-green-400',
     bgColor: 'bg-green-100 dark:bg-green-900/30',
   },
   subscription_fee: {
-    label: '月費',
+    labelKey: 'txSubscription',
     icon: <CreditCard className="w-4 h-4" />,
     color: 'text-blue-600 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30',
   },
   action_fee: {
-    label: '操作抽成',
+    labelKey: 'txActionFee',
     icon: <Zap className="w-4 h-4" />,
     color: 'text-purple-600 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
   },
   ai_audience: {
-    label: 'AI 受眾分析',
+    labelKey: 'txAiAudience',
     icon: <Target className="w-4 h-4" />,
     color: 'text-orange-600 dark:text-orange-400',
     bgColor: 'bg-orange-100 dark:bg-orange-900/30',
   },
   ai_copywriting: {
-    label: 'AI 文案生成',
+    labelKey: 'txAiCopywriting',
     icon: <Sparkles className="w-4 h-4" />,
     color: 'text-pink-600 dark:text-pink-400',
     bgColor: 'bg-pink-100 dark:bg-pink-900/30',
   },
   ai_image: {
-    label: 'AI 圖片生成',
+    labelKey: 'txAiImage',
     icon: <ImageIcon className="w-4 h-4" />,
     color: 'text-indigo-600 dark:text-indigo-400',
     bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
   },
   refund: {
-    label: '退款',
+    labelKey: 'txRefund',
     icon: <RefreshCw className="w-4 h-4" />,
     color: 'text-gray-600 dark:text-gray-400',
     bgColor: 'bg-gray-100 dark:bg-gray-900/30',
@@ -87,6 +88,7 @@ const TRANSACTION_CONFIG: Record<string, {
  * 交易列表元件
  */
 export function TransactionList({ transactions, showTitle = true, limit }: TransactionListProps) {
+  const t = useTranslations('billing');
   const displayTransactions = limit ? transactions.slice(0, limit) : transactions;
 
   const formatAmount = (amount: number) => {
@@ -105,11 +107,18 @@ export function TransactionList({ transactions, showTitle = true, limit }: Trans
   };
 
   const getTransactionConfig = (type: string) => {
-    return TRANSACTION_CONFIG[type] || {
-      label: type,
-      icon: <ArrowUpRight className="w-4 h-4" />,
-      color: 'text-gray-600 dark:text-gray-400',
-      bgColor: 'bg-gray-100 dark:bg-gray-900/30',
+    const config = TRANSACTION_CONFIG[type];
+    if (!config) {
+      return {
+        label: type,
+        icon: <ArrowUpRight className="w-4 h-4" />,
+        color: 'text-gray-600 dark:text-gray-400',
+        bgColor: 'bg-gray-100 dark:bg-gray-900/30',
+      };
+    }
+    return {
+      ...config,
+      label: t(config.labelKey),
     };
   };
 
@@ -118,12 +127,12 @@ export function TransactionList({ transactions, showTitle = true, limit }: Trans
       <Card>
         {showTitle && (
           <CardHeader>
-            <CardTitle className="text-lg">交易紀錄</CardTitle>
+            <CardTitle className="text-lg">{t('transactionHistory')}</CardTitle>
           </CardHeader>
         )}
         <CardContent>
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>尚無交易紀錄</p>
+            <p>{t('noTransactions')}</p>
           </div>
         </CardContent>
       </Card>
@@ -134,7 +143,7 @@ export function TransactionList({ transactions, showTitle = true, limit }: Trans
     <Card>
       {showTitle && (
         <CardHeader>
-          <CardTitle className="text-lg">交易紀錄</CardTitle>
+          <CardTitle className="text-lg">{t('transactionHistory')}</CardTitle>
         </CardHeader>
       )}
       <CardContent className="p-0">
@@ -180,7 +189,7 @@ export function TransactionList({ transactions, showTitle = true, limit }: Trans
                     {formatAmount(tx.amount)}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    餘額 {new Intl.NumberFormat('zh-TW').format(tx.balance_after)}
+                    {t('balanceAfter', { amount: new Intl.NumberFormat('zh-TW').format(tx.balance_after) })}
                   </p>
                 </div>
               </div>

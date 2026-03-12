@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import {
   Card,
   CardContent,
@@ -24,6 +25,8 @@ import { Input } from '@/components/ui/input'
  */
 export default function LoginPage() {
   const router = useRouter()
+  const t = useTranslations('login')
+  const tc = useTranslations('common')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -63,7 +66,7 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setError(data.error?.message || data.detail?.message || '登入失敗')
+        setError(data.error?.message || data.detail?.message || tc('loginFailed'))
         return
       }
 
@@ -76,7 +79,7 @@ export default function LoginPage() {
       // 跳轉到 dashboard
       router.push('/dashboard')
     } catch {
-      setError('無法連接到伺服器，請稍後再試')
+      setError(tc('serverError'))
     } finally {
       setIsLoading(false)
     }
@@ -95,12 +98,12 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setError(data.error?.message || data.detail?.message || data.error || '無法啟動 Google 登入')
+        setError(data.error?.message || data.detail?.message || data.error || t('cannotStartGoogle'))
         return
       }
 
       if (!data.auth_url) {
-        setError('Google OAuth 設定錯誤，請聯絡管理員')
+        setError(t('googleOAuthError'))
         return
       }
 
@@ -108,7 +111,7 @@ export default function LoginPage() {
       window.location.href = data.auth_url
     } catch (err) {
       console.error('Google 登入錯誤:', err)
-      setError('無法連接到伺服器，請稍後再試')
+      setError(tc('serverError'))
     } finally {
       setIsGoogleLoading(false)
     }
@@ -139,10 +142,10 @@ export default function LoginPage() {
 
         <div>
           <CardTitle className="text-2xl font-bold">
-            歡迎使用廣告船長
+            {t('title')}
           </CardTitle>
           <CardDescription className="text-base mt-2">
-            跨平台廣告優化工具
+            {t('subtitle')}
           </CardDescription>
         </div>
       </CardHeader>
@@ -152,7 +155,7 @@ export default function LoginPage() {
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <Input
             type="email"
-            placeholder="Email"
+            placeholder={t('emailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -161,7 +164,7 @@ export default function LoginPage() {
           />
           <Input
             type="password"
-            placeholder="密碼"
+            placeholder={t('passwordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -181,18 +184,18 @@ export default function LoginPage() {
             className="w-full h-12 text-base font-medium"
             disabled={isLoading}
           >
-            {isLoading ? '登入中...' : '登入'}
+            {isLoading ? tc('loggingIn') : tc('login')}
           </Button>
         </form>
 
         {/* 註冊連結 */}
         <div className="text-center text-sm">
-          <span className="text-gray-500">還沒有帳號？</span>{' '}
+          <span className="text-gray-500">{t('noAccount')}</span>{' '}
           <Link
             href="/auth/register"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
           >
-            立即註冊
+            {t('registerNow')}
           </Link>
         </div>
 
@@ -203,7 +206,7 @@ export default function LoginPage() {
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-              或使用平台帳號
+              {t('orUsePlatform')}
             </span>
           </div>
         </div>
@@ -235,7 +238,7 @@ export default function LoginPage() {
               />
             </svg>
           </div>
-          使用 Google 帳號登入
+          {t('googleLogin')}
         </Button>
 
         {/* 返回首頁連結 */}
@@ -244,7 +247,7 @@ export default function LoginPage() {
             href="/"
             className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            返回首頁
+            {tc('backToHome')}
           </Link>
         </div>
       </CardContent>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -37,13 +38,17 @@ const mockSettings: AutopilotSettings = {
   autoBoostEnabled: false,
 };
 
-const mockLogs: LogEntry[] = [
-  { id: '1', date: '1/22 14:30', action: '暫停「測試廣告 A」', savings: 2100 },
-  { id: '2', date: '1/20 09:15', action: '加碼「熱銷商品」+20%', earnings: 8500 },
-  { id: '3', date: '1/18 16:45', action: '暫停 3 個疲勞素材', savings: 1800 },
-];
-
 export default function AutopilotPage() {
+  const t = useTranslations('autopilot');
+  const tc = useTranslations('common');
+  const td = useTranslations('dashboard');
+
+  const mockLogs: LogEntry[] = [
+    { id: '1', date: '1/22 14:30', action: td('pauseAd'), savings: 2100 },
+    { id: '2', date: '1/20 09:15', action: td('boostAd'), earnings: 8500 },
+    { id: '3', date: '1/18 16:45', action: td('pauseFatigue'), savings: 1800 },
+  ];
+
   const [settings, setSettings] = useState<AutopilotSettings>(mockSettings);
   const [logs, setLogs] = useState<LogEntry[]>(mockLogs);
   const [isSaving, setIsSaving] = useState(false);
@@ -109,13 +114,13 @@ export default function AutopilotPage() {
         body: JSON.stringify(settings),
       });
       if (res.ok) {
-        setSaveToast('設定已儲存');
+        setSaveToast(t('settingsSaved'));
       } else {
-        setSaveToast('儲存失敗，請稍後再試');
+        setSaveToast(t('saveFailed'));
       }
     } catch (err) {
       console.error('Failed to save autopilot settings:', err);
-      setSaveToast('儲存失敗，請稍後再試');
+      setSaveToast(t('saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -128,17 +133,17 @@ export default function AutopilotPage() {
       {/* 頁面標題 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          🚗 自動駕駛
+          🚗 {t('title')}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          設定目標後，AI 會自動幫你優化廣告
+          {t('subtitle')}
         </p>
       </div>
 
       {/* 使用展示資料提示 */}
       {isUsingMockData && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
-          目前顯示的是展示資料。連接廣告帳號後將顯示真實數據。
+          {tc('mockDataNotice')}
         </div>
       )}
 
@@ -158,11 +163,11 @@ export default function AutopilotPage() {
             </span>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                狀態：{settings.enabled ? '運作中' : '未啟用'}
+                {t('statusLabel', { status: settings.enabled ? t('statusRunning') : t('statusDisabled') })}
               </h2>
               {settings.enabled && (
                 <p className="text-sm text-green-600 dark:text-green-400">
-                  已連續運作 15 天，幫你省下 ${totalSavings.toLocaleString()}
+                  {t('runningDays', { amount: totalSavings.toLocaleString() })}
                 </p>
               )}
             </div>
@@ -173,7 +178,7 @@ export default function AutopilotPage() {
               setSettings((prev) => ({ ...prev, enabled: !prev.enabled }))
             }
           >
-            {settings.enabled ? '暫停' : '啟用'}
+            {settings.enabled ? t('pause') : t('enable')}
           </Button>
         </div>
       </div>
@@ -181,20 +186,20 @@ export default function AutopilotPage() {
       {/* 目標設定 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-          🎯 目標設定
+          🎯 {t('goalSettings')}
         </h2>
 
         <div className="space-y-6">
           {/* 目標類型 */}
           <div>
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
-              目標類型
+              {t('goalType')}
             </Label>
             <div className="space-y-2">
               {[
-                { value: 'maximize_conversions', label: '最大化訂單數量' },
-                { value: 'maximize_revenue', label: '最大化營收' },
-                { value: 'minimize_cost', label: '控制成本為主' },
+                { value: 'maximize_conversions', label: t('maxConversions') },
+                { value: 'maximize_revenue', label: t('maxRevenue') },
+                { value: 'minimize_cost', label: t('minCost') },
               ].map((option) => (
                 <label
                   key={option.value}
@@ -227,7 +232,7 @@ export default function AutopilotPage() {
               htmlFor="targetCpa"
               className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block"
             >
-              每筆訂單成本上限
+              {t('targetCpa')}
             </Label>
             <div className="relative w-64">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -255,7 +260,7 @@ export default function AutopilotPage() {
               htmlFor="monthlyBudget"
               className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block"
             >
-              每月預算上限
+              {t('monthlyBudget')}
             </Label>
             <div className="relative w-64">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -282,17 +287,17 @@ export default function AutopilotPage() {
       {/* 自動執行權限 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-          ⚙️ 自動執行權限
+          ⚙️ {t('autoPermissions')}
         </h2>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium text-gray-900 dark:text-white">
-                自動暫停成本過高的廣告
+                {t('autoPauseHighCost')}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                當廣告成本超過目標 20% 連續 3 天
+                {t('autoPauseHighCostDesc')}
               </p>
             </div>
             <Switch
@@ -306,10 +311,10 @@ export default function AutopilotPage() {
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium text-gray-900 dark:text-white">
-                自動暫停疲勞的素材
+                {t('autoPauseFatigue')}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                當素材點擊率連續下降 7 天
+                {t('autoPauseFatigueDesc')}
               </p>
             </div>
             <Switch
@@ -323,10 +328,10 @@ export default function AutopilotPage() {
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium text-gray-900 dark:text-white">
-                自動調整預算分配
+                {t('autoAdjustBudget')}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                把預算從差的廣告移到好的廣告
+                {t('autoAdjustBudgetDesc')}
               </p>
             </div>
             <Switch
@@ -343,10 +348,10 @@ export default function AutopilotPage() {
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium text-gray-900 dark:text-white">
-                自動加碼表現好的廣告
+                {t('autoBoost')}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                當廣告投報率 &gt; 4 倍，自動增加 20% 預算
+                {t('autoBoostDesc')}
               </p>
             </div>
             <Switch
@@ -360,7 +365,7 @@ export default function AutopilotPage() {
 
         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? '儲存中...' : '儲存設定'}
+            {isSaving ? tc('saving') : t('saveSettings')}
           </Button>
         </div>
       </div>
@@ -368,7 +373,7 @@ export default function AutopilotPage() {
       {/* 最近執行記錄 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          📜 最近執行記錄
+          📜 {t('recentLogs')}
         </h2>
 
         <div className="space-y-3">
@@ -388,12 +393,12 @@ export default function AutopilotPage() {
               <div>
                 {log.savings && (
                   <span className="text-green-600 dark:text-green-400 font-medium">
-                    省下 ${log.savings.toLocaleString()}
+                    {t('savedAmount', { amount: log.savings.toLocaleString() })}
                   </span>
                 )}
                 {log.earnings && (
                   <span className="text-blue-600 dark:text-blue-400 font-medium">
-                    預估多賺 ${log.earnings.toLocaleString()}
+                    {t('earnedAmount', { amount: log.earnings.toLocaleString() })}
                   </span>
                 )}
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface AIAction {
   id: string;
@@ -16,14 +17,16 @@ interface AIActionsListProps {
 }
 
 export function AIActionsList({ actions }: AIActionsListProps) {
+  const t = useTranslations('dashboard');
+
   if (actions.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          🤖 AI 今天幫你做了什麼
+          🤖 {t('aiActionsTitle')}
         </h2>
         <p className="text-gray-500 dark:text-gray-400">
-          目前還沒有執行任何動作
+          {t('noActionsYet')}
         </p>
       </div>
     );
@@ -33,13 +36,13 @@ export function AIActionsList({ actions }: AIActionsListProps) {
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          🤖 AI 今天幫你做了什麼
+          🤖 {t('aiActionsTitle')}
         </h2>
         <Link
           href="/autopilot"
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
-          查看更多
+          {t('viewMore')}
         </Link>
       </div>
 
@@ -63,12 +66,12 @@ export function AIActionsList({ actions }: AIActionsListProps) {
             <div>
               {action.savings && (
                 <span className="text-green-600 dark:text-green-400 font-medium">
-                  省 ${action.savings.toLocaleString()}
+                  {t('savedShort', { amount: action.savings.toLocaleString() })}
                 </span>
               )}
               {action.earnings && (
                 <span className="text-blue-600 dark:text-blue-400 font-medium">
-                  +${action.earnings.toLocaleString()}
+                  {t('earnedShort', { amount: action.earnings.toLocaleString() })}
                 </span>
               )}
             </div>

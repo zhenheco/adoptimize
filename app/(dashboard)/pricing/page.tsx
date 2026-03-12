@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, AlertCircle, Check, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { PricingTable } from "@/components/billing";
@@ -29,6 +30,9 @@ interface Subscription {
  * 定價方案頁面
  */
 export default function PricingPage() {
+  const t = useTranslations("pricing");
+  const tc = useTranslations("common");
+  const tb = useTranslations("billing");
   const [plans, setPlans] = useState<Record<string, PlanConfig> | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,7 +134,7 @@ export default function PricingPage() {
 
     const token = getToken();
     if (!token) {
-      setToast({ type: "error", message: "請先登入" });
+      setToast({ type: "error", message: tc("pleaseLogin") });
       return;
     }
 
@@ -143,9 +147,9 @@ export default function PricingPage() {
     const planOrder = ["free", "pro", "agency"];
     const isUpgrade =
       planOrder.indexOf(plan) > planOrder.indexOf(subscription.plan);
-    const action = isUpgrade ? "升級" : "變更";
+    const action = isUpgrade ? t("upgrade") : t("change");
 
-    if (!confirm(`確定要${action}到 ${planNames[plan]} 方案嗎？`)) {
+    if (!confirm(t("confirmUpgrade", { action, plan: planNames[plan] }))) {
       return;
     }
 
@@ -166,17 +170,17 @@ export default function PricingPage() {
         setSubscription(data);
         setToast({
           type: "success",
-          message: `已成功${action}到 ${planNames[plan]} 方案`,
+          message: t("upgradeSuccess", { action, plan: planNames[plan] }),
         });
       } else {
         setToast({
           type: "error",
-          message: data.error?.message || data.detail || "方案變更失敗",
+          message: data.error?.message || data.detail || t("upgradeFailed"),
         });
       }
     } catch (err) {
       console.error("Upgrade error:", err);
-      setToast({ type: "error", message: "方案變更失敗，請稍後再試" });
+      setToast({ type: "error", message: t("upgradeRetry") });
     } finally {
       setIsUpgrading(false);
     }
@@ -232,13 +236,13 @@ export default function PricingPage() {
             className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            返回帳單
+            {tb("backToBilling")}
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            選擇方案
+            {t("title")}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            根據您的需求選擇最適合的方案
+            {t("subtitle")}
           </p>
         </div>
       </div>
@@ -246,19 +250,17 @@ export default function PricingPage() {
       {/* 方案比較說明 */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-          方案差異說明
+          {t("planDifference")}
         </h3>
         <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
           <li>
-            • <strong>操作抽成費率</strong>
-            ：執行廣告操作時，依預算金額收取的服務費比例
+            • {t("commissionDesc")}
           </li>
           <li>
-            • <strong>AI 配額</strong>：每月免費使用 AI
-            功能的次數，超額後按次計費
+            • {t("aiQuotaDesc")}
           </li>
           <li>
-            • <strong>月費</strong>：方案基本費用，Free 方案完全免費
+            • {t("monthlyFeeDesc")}
           </li>
         </ul>
       </div>
@@ -276,45 +278,39 @@ export default function PricingPage() {
       {/* FAQ */}
       <div className="mt-12 space-y-6">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-          常見問題
+          {t("faq")}
         </h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-              什麼是操作抽成？
+              {t("faqCommissionTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              當您透過廣告船長執行廣告操作（如建立廣告活動、調整預算等）時，
-              系統會根據您的方案費率，按操作金額收取服務費。 例如：Free 方案執行
-              NT$10,000 預算的操作，服務費為 NT$1,000 (10%)。
+              {t("faqCommissionDesc")}
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-              AI 配額用完會怎樣？
+              {t("faqQuotaTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              配額用完後，您仍可繼續使用 AI 功能， 但會從錢包餘額中扣除費用。
-              文案生成 NT$5/次，圖片生成 NT$10/次（依方案不同略有差異）。
+              {t("faqQuotaDesc")}
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-              可以隨時升級或降級嗎？
+              {t("faqChangeTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              可以！您可以隨時變更方案。
-              升級後立即生效，享受更低的抽成費率和更多配額。
-              降級後也會立即生效，抽成費率和配額會調整為新方案的標準。
+              {t("faqChangeDesc")}
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-              月費什麼時候扣款？
+              {t("faqBillingTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              月費會在每月 1 日從錢包餘額中自動扣除。
-              如果餘額不足，系統會發送通知提醒您儲值。 Free 方案沒有月費。
+              {t("faqBillingDesc")}
             </p>
           </div>
         </div>

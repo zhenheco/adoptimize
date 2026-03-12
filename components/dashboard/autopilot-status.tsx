@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 interface AutopilotStatusProps {
   enabled: boolean;
@@ -19,6 +20,8 @@ export function AutopilotStatus({
   daysSinceStart,
   totalSavings,
 }: AutopilotStatusProps) {
+  const t = useTranslations('dashboard');
+
   if (!enabled) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -27,16 +30,16 @@ export function AutopilotStatus({
             <span className="text-3xl">⚪</span>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
-                自動駕駛未啟用
+                {t('autopilotDisabled')}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                啟用後 AI 會自動幫你優化廣告，讓你省錢又省心
+                {t('autopilotDisabledDesc')}
               </p>
             </div>
           </div>
           <Link href="/autopilot">
             <Button>
-              立即啟用
+              {t('enableNow')}
             </Button>
           </Link>
         </div>
@@ -51,18 +54,18 @@ export function AutopilotStatus({
           <span className="text-3xl">🟢</span>
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white">
-              自動駕駛運作中
+              {t('autopilotRunning')}
             </h2>
             <p className="text-sm text-green-700 dark:text-green-400">
-              {daysSinceStart ? `已連續運作 ${daysSinceStart} 天` : '運作中'}
-              {totalSavings ? `，幫你省下 $${totalSavings.toLocaleString()}` : ''}
+              {daysSinceStart ? t('runningForDays', { days: daysSinceStart }) : t('autopilotRunning')}
+              {totalSavings ? `，${t('savedAmount', { amount: totalSavings.toLocaleString() })}` : ''}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right text-sm text-gray-600 dark:text-gray-300">
-            {targetCpa && <p>目標成本 ${targetCpa}/筆</p>}
-            {monthlyBudget && <p>月預算 ${monthlyBudget.toLocaleString()}</p>}
+            {targetCpa && <p>{t('targetCostLabel', { amount: targetCpa })}</p>}
+            {monthlyBudget && <p>{t('monthlyBudgetLabel', { amount: monthlyBudget.toLocaleString() })}</p>}
           </div>
           <Link href="/autopilot">
             <Button variant="outline" size="icon">

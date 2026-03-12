@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +68,8 @@ interface AIQuota {
  * 帳單總覽頁面
  */
 export default function BillingPage() {
+  const t = useTranslations('billing');
+  const tc = useTranslations('common');
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -93,7 +96,7 @@ export default function BillingPage() {
     async function fetchData() {
       const token = getToken();
       if (!token) {
-        setError('請先登入');
+        setError(tc('pleaseLogin'));
         setIsLoading(false);
         return;
       }
@@ -130,7 +133,7 @@ export default function BillingPage() {
         }
       } catch (err) {
         console.error('Failed to fetch billing data:', err);
-        setError('載入資料失敗');
+        setError(tc('loadFailed'));
       } finally {
         setIsLoading(false);
       }
@@ -143,13 +146,13 @@ export default function BillingPage() {
   const handleDeposit = async () => {
     const amount = parseInt(depositAmount);
     if (isNaN(amount) || amount <= 0) {
-      setToast({ type: 'error', message: '請輸入有效金額' });
+      setToast({ type: 'error', message: t('invalidAmount') });
       return;
     }
 
     const token = getToken();
     if (!token) {
-      setToast({ type: 'error', message: '請先登入' });
+      setToast({ type: 'error', message: tc('pleaseLogin') });
       return;
     }
 
@@ -169,7 +172,7 @@ export default function BillingPage() {
       if (response.ok && data.success) {
         setToast({
           type: 'success',
-          message: `成功儲值 NT$${amount.toLocaleString()}`,
+          message: t('depositSuccess', { amount: amount.toLocaleString() }),
         });
         // 更新錢包餘額
         setWallet((prev) =>
@@ -187,12 +190,12 @@ export default function BillingPage() {
       } else {
         setToast({
           type: 'error',
-          message: data.error || '儲值失敗',
+          message: data.error || t('depositFailed'),
         });
       }
     } catch (err) {
       console.error('Deposit error:', err);
-      setToast({ type: 'error', message: '儲值失敗，請稍後再試' });
+      setToast({ type: 'error', message: t('depositRetry') });
     } finally {
       setIsDepositing(false);
     }
@@ -220,7 +223,7 @@ export default function BillingPage() {
         <AlertCircle className="w-12 h-12 text-red-500" />
         <p className="text-gray-500">{error}</p>
         <Link href="/auth/login">
-          <Button>前往登入</Button>
+          <Button>{tc('goToLogin')}</Button>
         </Link>
       </div>
     );
@@ -256,15 +259,15 @@ export default function BillingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            帳單與錢包
+            {t('title')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            管理您的錢包餘額、訂閱方案與交易紀錄
+            {t('subtitle')}
           </p>
         </div>
         <Link href="/pricing">
           <Button variant="outline">
-            查看方案
+            {tc('viewPlans')}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </Link>
@@ -287,9 +290,9 @@ export default function BillingPage() {
                   <Plus className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">錢包儲值</CardTitle>
+                  <CardTitle className="text-lg">{t('walletDeposit')}</CardTitle>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    選擇金額或自訂儲值金額
+                    {t('depositDesc')}
                   </p>
                 </div>
               </div>
@@ -318,7 +321,7 @@ export default function BillingPage() {
                     </span>
                     <Input
                       type="number"
-                      placeholder="輸入金額"
+                      placeholder={t('enterAmount')}
                       value={depositAmount}
                       onChange={(e) => setDepositAmount(e.target.value)}
                       className="pl-12"
@@ -335,14 +338,14 @@ export default function BillingPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4 mr-2" />
-                        儲值
+                        {t('deposit')}
                       </>
                     )}
                   </Button>
                 </div>
 
                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                  * 目前為測試模式，儲值將直接入帳
+                  {t('testMode')}
                 </p>
               </div>
             </CardContent>

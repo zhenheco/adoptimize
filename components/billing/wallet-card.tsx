@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Wallet, Plus, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface WalletCardProps {
   balance: number;
@@ -17,6 +18,7 @@ interface WalletCardProps {
  * 顯示錢包餘額，可選擇顯示儲值按鈕
  */
 export function WalletCard({ balance, showDepositButton = true, compact = false }: WalletCardProps) {
+  const t = useTranslations('billing');
   // 格式化金額
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('zh-TW', {
@@ -53,7 +55,7 @@ export function WalletCard({ balance, showDepositButton = true, compact = false 
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
-          錢包餘額
+          {t('walletBalance')}
         </CardTitle>
         <Wallet className="w-4 h-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
@@ -71,7 +73,7 @@ export function WalletCard({ balance, showDepositButton = true, compact = false 
             </div>
             {isLowBalance && (
               <p className={`text-sm mt-1 ${isCriticalBalance ? 'text-red-500' : 'text-yellow-500'}`}>
-                {isCriticalBalance ? '餘額不足，請立即儲值' : '餘額偏低，建議儲值'}
+                {isCriticalBalance ? t('balanceCritical') : t('balanceLow')}
               </p>
             )}
           </div>
@@ -79,7 +81,7 @@ export function WalletCard({ balance, showDepositButton = true, compact = false 
             <Link href="/billing">
               <Button size="sm" className="gap-1">
                 <Plus className="w-4 h-4" />
-                儲值
+                {t('deposit')}
               </Button>
             </Link>
           )}

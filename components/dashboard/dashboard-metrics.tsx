@@ -3,6 +3,7 @@
 import { useDashboardOverview } from "@/hooks/use-dashboard-overview";
 import { MetricCard, type MetricStatus } from "./metric-card";
 import type { TimePeriod } from "@/lib/api/types";
+import { useTranslations } from "next-intl";
 
 /**
  * 儀表板指標元件屬性
@@ -39,6 +40,7 @@ function MetricsSkeleton() {
  * 顯示 6 個核心指標：總花費、曝光、點擊、轉換、CPA、ROAS
  */
 export function DashboardMetrics({ period = "7d" }: DashboardMetricsProps) {
+  const t = useTranslations("dashboard");
   const { data, isLoading } = useDashboardOverview(period);
 
   if (isLoading) {
@@ -63,28 +65,28 @@ export function DashboardMetrics({ period = "7d" }: DashboardMetricsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       <MetricCard
-        title="總花費"
+        title={t("totalSpend")}
         value={`$${metrics.spend.value.toLocaleString()}`}
         change={metrics.spend.change}
         status={metrics.spend.status}
         termId="spend"
       />
       <MetricCard
-        title="曝光次數"
+        title={t("impressions")}
         value={metrics.impressions.value.toLocaleString()}
         change={metrics.impressions.change}
         status={metrics.impressions.status}
         termId="impressions"
       />
       <MetricCard
-        title="點擊數"
+        title={t("clicks")}
         value={metrics.clicks.value.toLocaleString()}
         change={metrics.clicks.change}
         status={metrics.clicks.status}
         termId="clicks"
       />
       <MetricCard
-        title="轉換數"
+        title={t("conversionCount")}
         value={metrics.conversions.value.toLocaleString()}
         change={metrics.conversions.change}
         status={metrics.conversions.status}

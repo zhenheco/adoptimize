@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -95,6 +96,8 @@ function SettingItem({ label, description, checked, onCheckedChange }: SettingIt
  * 註：主題切換功能已移至側邊欄 Logo 旁
  */
 export default function SettingsPage() {
+  const t = useTranslations('settings');
+  const tc = useTranslations('common');
   // 獲取已連結的帳戶
   const { accounts, isLoading: isLoadingAccounts, error: accountsError } = useAccounts();
 
@@ -113,7 +116,7 @@ export default function SettingsPage() {
    * 格式化最後同步時間
    */
   const formatLastSync = (isoString: string | undefined) => {
-    if (!isoString) return '尚未同步';
+    if (!isoString) return tc('notSynced');
     const date = new Date(isoString);
     return date.toLocaleString('zh-TW', {
       month: 'short',
@@ -127,41 +130,41 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* 頁面標題 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">設定</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          管理您的帳戶、通知和系統偏好設定
+          {t('subtitle')}
         </p>
       </div>
 
       {/* 1. 帳戶連結區塊 */}
       <SettingsSection
         icon={<Link2 className="w-5 h-5" />}
-        title="帳戶連結"
-        description="管理已連結的廣告平台帳戶"
+        title={t('accountLinks')}
+        description={t('accountLinksDesc')}
       >
         <div className="space-y-4">
           {isLoadingAccounts ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-              <span className="ml-2 text-sm text-gray-500">載入帳戶中...</span>
+              <span className="ml-2 text-sm text-gray-500">{t('loadingAccounts')}</span>
             </div>
           ) : accountsError ? (
             <div className="text-center py-8">
               <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
               <p className="text-sm text-red-600 dark:text-red-400">
-                載入帳戶時發生錯誤
+                {t('loadAccountError')}
               </p>
             </div>
           ) : accounts.length === 0 ? (
             <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
               <Link2 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                尚未連結任何廣告帳戶
+                {t('noAccountsLinked')}
               </p>
               <Link href="/accounts">
                 <Button variant="default" size="sm">
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  連結帳戶
+                  {t('linkAccount')}
                 </Button>
               </Link>
             </div>
@@ -187,7 +190,7 @@ export default function SettingsPage() {
                         {account.name}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        最後同步: {formatLastSync(account.last_sync_at)}
+                        {tc('lastSync')}: {formatLastSync(account.last_sync_at)}
                       </p>
                     </div>
                   </div>
@@ -195,12 +198,12 @@ export default function SettingsPage() {
                     {account.status === 'active' ? (
                       <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
                         <Check className="w-4 h-4" />
-                        已連結
+                        {tc('connected')}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-sm text-yellow-600 dark:text-yellow-400">
                         <AlertCircle className="w-4 h-4" />
-                        {account.status === 'paused' ? '已暫停' : '需重新授權'}
+                        {account.status === 'paused' ? tc('paused') : tc('needReauth')}
                       </span>
                     )}
                   </div>
@@ -210,7 +213,7 @@ export default function SettingsPage() {
               <Link href="/accounts">
                 <Button variant="outline" className="w-full mt-2">
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  管理帳戶
+                  {t('manageAccounts')}
                 </Button>
               </Link>
             </>
@@ -221,37 +224,37 @@ export default function SettingsPage() {
       {/* 2. 通知設定區塊 */}
       <SettingsSection
         icon={<Bell className="w-5 h-5" />}
-        title="通知設定"
-        description="設定您想要接收的通知類型"
+        title={t('notifications')}
+        description={t('notificationsDesc')}
       >
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           <SettingItem
-            label="素材疲勞警告"
-            description="當素材疲勞度超過 70% 時通知"
+            label={t('fatigueAlert')}
+            description={t('fatigueAlertDesc')}
             checked={notifications.fatigueAlert}
             onCheckedChange={(checked) =>
               setNotifications((prev) => ({ ...prev, fatigueAlert: checked }))
             }
           />
           <SettingItem
-            label="健康分數下降"
-            description="當帳戶健康分數下降超過 10 分時通知"
+            label={t('healthDrop')}
+            description={t('healthDropDesc')}
             checked={notifications.healthDrop}
             onCheckedChange={(checked) =>
               setNotifications((prev) => ({ ...prev, healthDrop: checked }))
             }
           />
           <SettingItem
-            label="優化建議"
-            description="有新的優化建議時通知"
+            label={t('recommendations')}
+            description={t('recommendationsDesc')}
             checked={notifications.recommendations}
             onCheckedChange={(checked) =>
               setNotifications((prev) => ({ ...prev, recommendations: checked }))
             }
           />
           <SettingItem
-            label="每週報告"
-            description="每週一發送效能摘要報告"
+            label={t('weeklyReport')}
+            description={t('weeklyReportDesc')}
             checked={notifications.weeklyReport}
             onCheckedChange={(checked) =>
               setNotifications((prev) => ({ ...prev, weeklyReport: checked }))
@@ -263,14 +266,14 @@ export default function SettingsPage() {
       {/* 3. 同步頻率區塊 */}
       <SettingsSection
         icon={<RefreshCw className="w-5 h-5" />}
-        title="同步頻率"
-        description="設定資料自動同步的時間間隔"
+        title={t('syncFrequency')}
+        description={t('syncFrequencyDesc')}
       >
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label className="text-sm font-medium">自動同步間隔</Label>
+            <Label className="text-sm font-medium">{t('autoSyncInterval')}</Label>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              系統會按此頻率從廣告平台同步最新數據
+              {t('autoSyncIntervalDesc')}
             </p>
           </div>
           <Select value={syncFrequency} onValueChange={setSyncFrequency}>
@@ -278,9 +281,9 @@ export default function SettingsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="15">15 分鐘</SelectItem>
-              <SelectItem value="30">30 分鐘</SelectItem>
-              <SelectItem value="60">1 小時</SelectItem>
+              <SelectItem value="15">{t('minutes15')}</SelectItem>
+              <SelectItem value="30">{t('minutes30')}</SelectItem>
+              <SelectItem value="60">{t('hour1')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -289,20 +292,20 @@ export default function SettingsPage() {
       {/* 4. 資料匯出區塊 */}
       <SettingsSection
         icon={<Download className="w-5 h-5" />}
-        title="資料匯出"
-        description="匯出您的廣告數據報告"
+        title={t('dataExport')}
+        description={t('dataExportDesc')}
       >
         <div className="flex gap-3">
           <Button variant="outline" disabled>
             <Download className="w-4 h-4 mr-2" />
-            匯出 CSV
+            {t('exportCSV')}
           </Button>
           <Button variant="outline" disabled>
             <Download className="w-4 h-4 mr-2" />
-            匯出 PDF
+            {t('exportPDF')}
           </Button>
           <span className="text-sm text-gray-500 dark:text-gray-400 self-center ml-2">
-            即將推出
+            {tc('comingSoon')}
           </span>
         </div>
       </SettingsSection>
@@ -310,13 +313,13 @@ export default function SettingsPage() {
       {/* 5. 導覽設定區塊 */}
       <SettingsSection
         icon={<HelpCircle className="w-5 h-5" />}
-        title="導覽設定"
-        description="重新觀看產品導覽教學"
+        title={t('tourSettings')}
+        description={t('tourSettingsDesc')}
       >
         <div className="flex items-center gap-4">
           <RestartTourButton />
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            點擊按鈕重新啟動新手導覽，了解各項功能
+            {t('tourHint')}
           </p>
         </div>
       </SettingsSection>

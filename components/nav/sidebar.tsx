@@ -17,16 +17,18 @@ import {
   Ship,
   Wallet,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { RestartTourButton } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/use-user";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 /**
  * 導航項目介面
  */
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -36,12 +38,12 @@ interface NavItem {
  * SDD v2.0: 簡化導航，聚焦自動駕駛和 AI 創作
  */
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "首頁", icon: LayoutDashboard },
-  { href: "/autopilot", label: "自動駕駛", icon: Car },
-  { href: "/ai-studio", label: "AI 創作", icon: Sparkles },
-  { href: "/reports", label: "報告", icon: FileText },
-  { href: "/accounts", label: "帳號連接", icon: Link2 },
-  { href: "/billing", label: "帳單", icon: Wallet },
+  { href: "/dashboard", labelKey: "home", icon: LayoutDashboard },
+  { href: "/autopilot", labelKey: "autopilot", icon: Car },
+  { href: "/ai-studio", labelKey: "aiStudio", icon: Sparkles },
+  { href: "/reports", labelKey: "reports", icon: FileText },
+  { href: "/accounts", labelKey: "accounts", icon: Link2 },
+  { href: "/billing", labelKey: "billing", icon: Wallet },
 ];
 
 /**
@@ -53,6 +55,8 @@ export function Sidebar() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { userEmail, clearUser } = useUser();
+  const t = useTranslations("nav");
+  const tc = useTranslations("common");
 
   /**
    * 判斷導航項目是否為當前頁面
@@ -97,7 +101,7 @@ export function Sidebar() {
               <Ship className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">
-              廣告船長
+              {tc("brandName")}
             </span>
           </Link>
           <Button
@@ -105,11 +109,11 @@ export function Sidebar() {
             size="icon"
             onClick={toggleTheme}
             className="h-8 w-8"
-            title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
+            title={theme === "dark" ? tc("lightMode") : tc("darkMode")}
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">切換主題</span>
+            <span className="sr-only">{tc("toggleTheme")}</span>
           </Button>
         </div>
       </div>
@@ -132,7 +136,7 @@ export function Sidebar() {
               )}
             >
               <Icon className="w-5 h-5" />
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}
@@ -140,20 +144,23 @@ export function Sidebar() {
 
       {/* 底部操作區域 */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+        <div className="flex items-center justify-between px-3 py-1">
+          <LocaleSwitcher />
+        </div>
         <RestartTourButton />
         <Link
           href="/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
         >
           <Settings className="w-5 h-5" />
-          設定
+          {tc("settings")}
         </Link>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
         >
           <LogOut className="w-5 h-5" />
-          登出
+          {tc("logout")}
         </button>
       </div>
 

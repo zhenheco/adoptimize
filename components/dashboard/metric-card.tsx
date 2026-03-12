@@ -1,6 +1,9 @@
+'use client';
+
 import { cn, formatChange, getStatusIcon, getAnomalyStatus, type AnomalyStatus } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { TermTooltip } from '@/components/ui/term-tooltip';
+import { useTranslations } from 'next-intl';
 
 /**
  * 指標狀態類型
@@ -28,7 +31,7 @@ export interface MetricCardProps {
 /**
  * 取得異常標記的圖示和樣式
  */
-function getAnomalyMarkerInfo(anomalyStatus: AnomalyStatus): {
+function getAnomalyMarkerInfo(anomalyStatus: AnomalyStatus, labels: { danger: string; warning: string }): {
   icon: string;
   title: string;
   className: string;
@@ -37,13 +40,13 @@ function getAnomalyMarkerInfo(anomalyStatus: AnomalyStatus): {
     case 'danger':
       return {
         icon: '⚠️',
-        title: '異常警示: 嚴重下降',
+        title: labels.danger,
         className: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800',
       };
     case 'warning':
       return {
         icon: '⚡',
-        title: '異常警示: 中度下降',
+        title: labels.warning,
         className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
       };
     default:
@@ -71,6 +74,8 @@ export function MetricCard({
   invertChange = false,
   termId,
 }: MetricCardProps) {
+  const t = useTranslations('dashboard');
+
   // 判斷變化方向是否為正向
   const isPositiveChange = invertChange ? change < 0 : change > 0;
   const isNeutral = change === 0;
@@ -91,7 +96,10 @@ export function MetricCard({
 
   // D-005: 計算異常狀態
   const anomalyStatus = getAnomalyStatus(change);
-  const anomalyMarker = getAnomalyMarkerInfo(anomalyStatus);
+  const anomalyMarker = getAnomalyMarkerInfo(anomalyStatus, {
+    danger: t('anomalyDanger'),
+    warning: t('anomalyWarning'),
+  });
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -116,7 +124,7 @@ export function MetricCard({
               {anomalyMarker.icon}
             </span>
           )}
-          <span className="text-sm" title={`狀態: ${status}`}>
+          <span className="text-sm" title={`${t('statusLabel')} ${status}`}>
             {getStatusIcon(status)}
           </span>
         </div>
@@ -132,7 +140,7 @@ export function MetricCard({
         <ChangeIcon className="w-4 h-4" />
         <span>{formatChange(change)}</span>
         <span className="text-gray-400 dark:text-gray-500 ml-1">
-          vs 上期
+          {t('vsPrevious')}
         </span>
       </div>
     </div>

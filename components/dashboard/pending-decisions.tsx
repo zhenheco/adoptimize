@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 interface Decision {
   id: string;
@@ -16,6 +17,8 @@ interface PendingDecisionsProps {
 }
 
 export function PendingDecisions({ decisions, onDecide }: PendingDecisionsProps) {
+  const t = useTranslations('dashboard');
+
   if (decisions.length === 0) {
     return null;
   }
@@ -23,7 +26,7 @@ export function PendingDecisions({ decisions, onDecide }: PendingDecisionsProps)
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        📢 需要你決定的事
+        📢 {t('pendingDecisionsTitle')}
       </h2>
 
       <div className="space-y-4">

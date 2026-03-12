@@ -29,6 +29,7 @@ from app.routers import (
     autopilot,
     billing,
     creatives,
+    cron_triggers,
     dashboard,
     health,
     history,
@@ -185,4 +186,10 @@ api_router.include_router(
     oauth_pinterest.router,
     prefix="/accounts/connect/pinterest",
     tags=["OAuth - Pinterest"],
+)
+
+# CF Cron Worker 觸發端點
+api_router.include_router(
+    cron_triggers.router,
+    tags=["Cron Triggers"],
 )

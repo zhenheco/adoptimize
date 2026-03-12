@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import {
   Card,
   CardContent,
@@ -20,6 +21,8 @@ import { Input } from '@/components/ui/input'
  */
 export default function RegisterPage() {
   const router = useRouter()
+  const t = useTranslations('register')
+  const tc = useTranslations('common')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -54,31 +57,31 @@ export default function RegisterPage() {
     const errors: Record<string, string> = {}
 
     if (!formData.email) {
-      errors.email = '請輸入 Email'
+      errors.email = t('emailRequired')
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = '請輸入有效的 Email'
+      errors.email = t('emailInvalid')
     }
 
     if (!formData.password) {
-      errors.password = '請輸入密碼'
+      errors.password = t('passwordRequired')
     } else if (formData.password.length < 8) {
-      errors.password = '密碼至少需要 8 個字元'
+      errors.password = t('passwordMinLength')
     } else if (!/[A-Z]/.test(formData.password)) {
-      errors.password = '密碼必須包含至少一個大寫字母'
+      errors.password = t('passwordUppercase')
     } else if (!/[a-z]/.test(formData.password)) {
-      errors.password = '密碼必須包含至少一個小寫字母'
+      errors.password = t('passwordLowercase')
     } else if (!/[0-9]/.test(formData.password)) {
-      errors.password = '密碼必須包含至少一個數字'
+      errors.password = t('passwordNumber')
     }
 
     if (!formData.confirmPassword) {
-      errors.confirmPassword = '請確認密碼'
+      errors.confirmPassword = t('confirmRequired')
     } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = '兩次輸入的密碼不一致'
+      errors.confirmPassword = t('passwordMismatch')
     }
 
     if (!formData.name) {
-      errors.name = '請輸入姓名'
+      errors.name = t('nameRequired')
     }
 
     setFieldErrors(errors)
@@ -116,9 +119,9 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         if (data.detail?.code === 'EMAIL_ALREADY_EXISTS') {
-          setFieldErrors({ email: '此 Email 已被註冊' })
+          setFieldErrors({ email: t('emailExists') })
         } else {
-          setError(data.error?.message || data.detail?.message || '註冊失敗')
+          setError(data.error?.message || data.detail?.message || tc('registerFailed'))
         }
         return
       }
@@ -126,7 +129,7 @@ export default function RegisterPage() {
       // 註冊成功，跳轉到登入頁面
       router.push('/auth/login?registered=true')
     } catch (err) {
-      setError('無法連接到伺服器，請稍後再試')
+      setError(tc('serverError'))
     } finally {
       setIsLoading(false)
     }
@@ -143,9 +146,9 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <CardTitle className="text-2xl font-bold">建立帳號</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t('title')}</CardTitle>
           <CardDescription className="text-base mt-2">
-            開始使用廣告船長優化您的廣告
+            {t('subtitle')}
           </CardDescription>
         </div>
       </CardHeader>
@@ -157,7 +160,7 @@ export default function RegisterPage() {
             <Input
               type="text"
               name="name"
-              placeholder="姓名"
+              placeholder={t('namePlaceholder')}
               value={formData.name}
               onChange={handleChange}
               disabled={isLoading}
@@ -173,7 +176,7 @@ export default function RegisterPage() {
             <Input
               type="email"
               name="email"
-              placeholder="Email"
+              placeholder={t('emailPlaceholder')}
               value={formData.email}
               onChange={handleChange}
               disabled={isLoading}
@@ -189,7 +192,7 @@ export default function RegisterPage() {
             <Input
               type="text"
               name="companyName"
-              placeholder="公司名稱（選填）"
+              placeholder={t('companyPlaceholder')}
               value={formData.companyName}
               onChange={handleChange}
               disabled={isLoading}
@@ -202,7 +205,7 @@ export default function RegisterPage() {
             <Input
               type="password"
               name="password"
-              placeholder="密碼"
+              placeholder={t('passwordPlaceholder')}
               value={formData.password}
               onChange={handleChange}
               disabled={isLoading}
@@ -212,7 +215,7 @@ export default function RegisterPage() {
               <p className="text-xs text-red-600">{fieldErrors.password}</p>
             )}
             <p className="text-xs text-gray-500">
-              至少 8 字元，包含大小寫字母和數字
+              {t('passwordHint')}
             </p>
           </div>
 
@@ -221,7 +224,7 @@ export default function RegisterPage() {
             <Input
               type="password"
               name="confirmPassword"
-              placeholder="確認密碼"
+              placeholder={t('confirmPasswordPlaceholder')}
               value={formData.confirmPassword}
               onChange={handleChange}
               disabled={isLoading}
@@ -246,18 +249,18 @@ export default function RegisterPage() {
             className="w-full h-12 text-base font-medium"
             disabled={isLoading}
           >
-            {isLoading ? '註冊中...' : '建立帳號'}
+            {isLoading ? tc('registering') : t('registerButton')}
           </Button>
         </form>
 
         {/* 登入連結 */}
         <div className="text-center text-sm">
-          <span className="text-gray-500">已經有帳號？</span>{' '}
+          <span className="text-gray-500">{t('hasAccount')}</span>{' '}
           <Link
             href="/auth/login"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
           >
-            立即登入
+            {t('loginNow')}
           </Link>
         </div>
 
@@ -267,7 +270,7 @@ export default function RegisterPage() {
             href="/"
             className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            返回首頁
+            {tc('backToHome')}
           </Link>
         </div>
       </CardContent>

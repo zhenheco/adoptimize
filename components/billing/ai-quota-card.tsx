@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, ImageIcon, AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface QuotaStatus {
   quota: number;
@@ -18,6 +19,8 @@ interface AIQuotaCardProps {
  * AI 配額卡片元件
  */
 export function AIQuotaCard({ copywriting, image }: AIQuotaCardProps) {
+  const t = useTranslations('billing');
+
   function getQuotaBarColor(isCritical: boolean, isWarning: boolean): string {
     if (isCritical) return 'bg-red-500';
     if (isWarning) return 'bg-yellow-500';
@@ -31,9 +34,9 @@ export function AIQuotaCard({ copywriting, image }: AIQuotaCardProps) {
   }
 
   function getQuotaMessage(isCritical: boolean, isWarning: boolean, remaining: number): string {
-    if (isCritical) return '配額即將用盡！';
-    if (isWarning) return '配額使用較多，請注意';
-    return `剩餘 ${remaining} 次`;
+    if (isCritical) return t('quotaCritical');
+    if (isWarning) return t('quotaWarning');
+    return t('quotaRemaining', { count: remaining });
   }
 
   function renderQuotaBar(
@@ -62,7 +65,7 @@ export function AIQuotaCard({ copywriting, image }: AIQuotaCardProps) {
             )}
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {isUnlimited
-                ? `已用 ${quota.used}`
+                ? t('usedCount', { count: quota.used })
                 : `${quota.used} / ${quota.quota}`
               }
             </span>
@@ -80,7 +83,7 @@ export function AIQuotaCard({ copywriting, image }: AIQuotaCardProps) {
         )}
         {isUnlimited ? (
           <p className="text-xs text-green-600 dark:text-green-400">
-            無限配額
+            {t('unlimitedQuota')}
           </p>
         ) : (
           <p className={`text-xs ${getQuotaTextColor(isCritical, isWarning)}`}>
@@ -94,17 +97,17 @@ export function AIQuotaCard({ copywriting, image }: AIQuotaCardProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg">AI 配額使用狀況</CardTitle>
+        <CardTitle className="text-lg">{t('aiQuotaTitle')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {renderQuotaBar(
-          'AI 文案生成',
+          t('aiCopywriting'),
           <Sparkles className="w-4 h-4" />,
           copywriting,
           'text-pink-500'
         )}
         {renderQuotaBar(
-          'AI 圖片生成',
+          t('aiImageGen'),
           <ImageIcon className="w-4 h-4" />,
           image,
           'text-indigo-500'
