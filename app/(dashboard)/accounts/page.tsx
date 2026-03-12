@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -47,9 +48,13 @@ interface AccountCardProps {
   account: AdAccount;
   onRefresh: (id: string) => void;
   onDisconnect: (id: string) => void;
+  statusLabels: Record<AccountStatus, string>;
+  syncNowLabel: string;
+  disconnectLabel: string;
+  lastSyncLabel: string;
 }
 
-function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
+function AccountCard({ account, onRefresh, onDisconnect, statusLabels, syncNowLabel, disconnectLabel, lastSyncLabel }: AccountCardProps) {
   const platformStyles = {
     google: {
       bg: "bg-red-100 dark:bg-red-900/30",
@@ -94,21 +99,21 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
   const statusConfig = {
     connected: {
       icon: <Check className="w-4 h-4" />,
-      label: "已連結",
+      label: statusLabels.connected,
       variant: "default" as const,
       className:
         "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
     },
     expired: {
       icon: <Clock className="w-4 h-4" />,
-      label: "授權過期",
+      label: statusLabels.expired,
       variant: "secondary" as const,
       className:
         "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
     },
     error: {
       icon: <AlertCircle className="w-4 h-4" />,
-      label: "連線錯誤",
+      label: statusLabels.error,
       variant: "destructive" as const,
       className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     },
@@ -156,7 +161,7 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
                 {style.label} • {account.accountId}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                最後同步: {formatLastSync(account.lastSync)}
+                {lastSyncLabel}: {formatLastSync(account.lastSync)}
               </p>
             </div>
           </div>
@@ -167,7 +172,7 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
               variant="ghost"
               size="sm"
               onClick={() => onRefresh(account.id)}
-              title="立即同步"
+              title={syncNowLabel}
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -176,7 +181,7 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
               size="sm"
               onClick={() => onDisconnect(account.id)}
               className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-              title="中斷連結"
+              title={disconnectLabel}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -197,9 +202,12 @@ function AccountCard({ account, onRefresh, onDisconnect }: AccountCardProps) {
  * - 同步/中斷連結操作
  */
 function AccountsContent() {
+  const t = useTranslations('accounts');
+  const tc = useTranslations('common');
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -271,12 +279,12 @@ function AccountsContent() {
       const platform = platformNames[success] || success;
       setToast({
         type: "success",
-        message: `成功連結 ${platform} 帳戶${accountId ? ` (${accountId})` : ""}`,
+        message: t('successConnect', { platform, accountId: accountId ? ` (${accountId})` : "" }),
       });
     } else if (error) {
       setToast({
         type: "error",
-        message: `連結失敗: ${decodeURIComponent(error)}`,
+        message: t('failConnect', { error: decodeURIComponent(error) }),
       });
     }
 
@@ -291,10 +299,12 @@ function AccountsContent() {
    * 連結 Google Ads 帳戶
    */
   const handleConnectGoogle = async () => {
+    if (isConnecting) return;
+    setIsConnecting("google");
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        setToast({ type: "error", message: "請先登入才能連接廣告帳戶" });
+        setToast({ type: "error", message: tc('loginRequired') });
         return;
       }
       const response = await fetch("/api/v1/accounts/connect/google", {
@@ -304,19 +314,21 @@ function AccountsContent() {
         const data = await response.json();
         if (data.auth_url) {
           window.location.href = data.auth_url;
+          return;
         }
       } else {
         const error = await response.json();
-        // 確保錯誤訊息是字串，不是物件
         const errorMsg =
           typeof error.error === "string"
             ? error.error
-            : error.error?.message || "無法取得授權連結";
+            : error.error?.message || tc('cannotGetAuthLink');
         setToast({ type: "error", message: errorMsg });
       }
     } catch (error) {
       console.error("Connect Google error:", error);
-      setToast({ type: "error", message: "連接失敗，請稍後再試" });
+      setToast({ type: "error", message: tc('connectFailed') });
+    } finally {
+      setIsConnecting(null);
     }
   };
 
@@ -324,10 +336,12 @@ function AccountsContent() {
    * 連結 Meta 帳戶
    */
   const handleConnectMeta = async () => {
+    if (isConnecting) return;
+    setIsConnecting("meta");
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        setToast({ type: "error", message: "請先登入才能連接廣告帳戶" });
+        setToast({ type: "error", message: tc('loginRequired') });
         return;
       }
       const response = await fetch("/api/v1/accounts/connect/meta", {
@@ -337,19 +351,21 @@ function AccountsContent() {
         const data = await response.json();
         if (data.auth_url) {
           window.location.href = data.auth_url;
+          return;
         }
       } else {
         const error = await response.json();
-        // 確保錯誤訊息是字串，不是物件
         const errorMsg =
           typeof error.error === "string"
             ? error.error
-            : error.error?.message || "無法取得授權連結";
+            : error.error?.message || tc('cannotGetAuthLink');
         setToast({ type: "error", message: errorMsg });
       }
     } catch (error) {
       console.error("Connect Meta error:", error);
-      setToast({ type: "error", message: "連接失敗，請稍後再試" });
+      setToast({ type: "error", message: tc('connectFailed') });
+    } finally {
+      setIsConnecting(null);
     }
   };
 
@@ -361,7 +377,7 @@ function AccountsContent() {
     // TODO: 呼叫 API 觸發同步
     setToast({
       type: "success",
-      message: "已觸發資料同步，請稍候...",
+      message: t('syncTriggered'),
     });
     setTimeout(() => setToast(null), 3000);
   };
@@ -378,20 +394,20 @@ function AccountsContent() {
       });
 
       if (!response.ok) {
-        throw new Error(`斷開連接失敗: ${response.status}`);
+        throw new Error(`${t('disconnectFailed')}: ${response.status}`);
       }
 
       // API 成功後才更新 UI
       setAccounts((prev) => prev.filter((a) => a.id !== id));
       setToast({
         type: "success",
-        message: "已中斷帳戶連結",
+        message: t('disconnected'),
       });
     } catch (error) {
       setToast({
         type: "error",
         message:
-          error instanceof Error ? error.message : "中斷連結失敗，請稍後再試",
+          error instanceof Error ? error.message : t('disconnectFailed'),
       });
     }
     setTimeout(() => setToast(null), 3000);
@@ -427,10 +443,10 @@ function AccountsContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            帳戶管理
+            {t('title')}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            管理您連結的廣告平台帳戶
+            {t('subtitle')}
           </p>
         </div>
       </div>
@@ -443,9 +459,9 @@ function AccountsContent() {
               <Plus className="w-5 h-5" />
             </div>
             <div>
-              <CardTitle className="text-lg">連結新帳戶</CardTitle>
+              <CardTitle className="text-lg">{t('connectNew')}</CardTitle>
               <CardDescription>
-                連結您的 Google Ads 或 Meta Ads 廣告帳戶以開始優化廣告投放
+                {t('connectNewDesc')}
               </CardDescription>
             </div>
           </div>
@@ -454,18 +470,28 @@ function AccountsContent() {
           <div className="flex flex-wrap gap-4">
             <Button
               onClick={handleConnectGoogle}
+              disabled={isConnecting !== null}
               className="flex-1 min-w-[150px]"
             >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 Google Ads
+              {isConnecting === "google" ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4 mr-2" />
+              )}
+              {t('connectGoogle')}
             </Button>
             <Button
               onClick={handleConnectMeta}
+              disabled={isConnecting !== null}
               variant="outline"
               className="flex-1 min-w-[150px]"
             >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              連結 Meta Ads
+              {isConnecting === "meta" ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4 mr-2" />
+              )}
+              {t('connectMeta')}
             </Button>
           </div>
           <div className="flex flex-wrap gap-3 mt-4">
@@ -482,7 +508,7 @@ function AccountsContent() {
                 <Lock className="w-3.5 h-3.5 text-gray-400" />
                 <span className="text-sm text-gray-400">{platform.label}</span>
                 <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">
-                  即將推出
+                  {tc('comingSoon')}
                 </span>
               </div>
             ))}
@@ -495,7 +521,7 @@ function AccountsContent() {
         <div className="flex items-center gap-2 mb-4">
           <Link2 className="w-5 h-5 text-gray-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            已連結帳戶
+            {t('connectedAccounts')}
           </h2>
           <Badge variant="secondary">{accounts.length}</Badge>
         </div>
@@ -508,6 +534,14 @@ function AccountsContent() {
                 account={account}
                 onRefresh={handleRefresh}
                 onDisconnect={handleDisconnect}
+                statusLabels={{
+                  connected: tc('connected'),
+                  expired: tc('expired'),
+                  error: tc('connectionError'),
+                }}
+                syncNowLabel={tc('syncNow')}
+                disconnectLabel={tc('disconnect')}
+                lastSyncLabel={tc('lastSync')}
               />
             ))}
           </div>
@@ -516,10 +550,10 @@ function AccountsContent() {
             <CardContent className="py-12 text-center">
               <Link2 className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                尚未連結任何帳戶
+                {t('noAccounts')}
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4">
-                連結您的廣告帳戶以開始使用 廣告船長
+                {t('noAccountsDesc')}
               </p>
             </CardContent>
           </Card>

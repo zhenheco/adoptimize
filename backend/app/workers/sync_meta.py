@@ -11,7 +11,6 @@ Meta Marketing API 數據同步 Worker
 - Audiences（受眾）
 """
 
-import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -31,9 +30,7 @@ from app.models.ad import Ad
 from app.models.creative import Creative
 from app.models.creative_metrics import CreativeMetrics
 from app.models.audience import Audience
-from app.models.audience_metrics import AudienceMetrics
 from app.services.meta_api_client import MetaAPIClient
-from app.services.token_manager import TokenManager
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -61,30 +58,6 @@ async def _get_meta_accounts() -> list[AdAccount]:
         return list(result.scalars().all())
 
 
-def sync_all_accounts(self):
-    """
-    同步所有 Meta Ads 帳戶
-
-    此任務由 Celery Beat 每 15 分鐘觸發一次
-    會查詢所有已連接的 Meta Ads 帳戶並逐一同步
-    """
-    logger.info("Starting Meta Ads sync for all accounts")
-
-    try:
-        # 取得所有活躍的 Meta Ads 帳戶
-        accounts = asyncio.run(_get_meta_accounts())
-        logger.info(f"Found {len(accounts)} Meta Ads accounts to sync")
-
-        # 對每個帳戶觸發同步任務
-        for account in accounts:
-            sync_account.delay(str(account.id))
-
-        logger.info("Meta Ads sync tasks dispatched")
-        return {"status": "completed", "accounts_synced": len(accounts)}
-
-    except Exception as e:
-        logger.error(f"Failed to dispatch Meta Ads sync: {e}")
-        return {"status": "error", "error": str(e)}
 
 
 async def _sync_meta_account(account_id: str) -> dict:
@@ -252,62 +225,8 @@ async def _sync_meta_account(account_id: str) -> dict:
         }
 
 
-def sync_account(self, account_id: str):
-    """
-    同步單一 Meta Ads 帳戶
-
-    Args:
-        account_id: 帳戶 UUID
-
-    實作功能：
-    1. 驗證 access_token 是否有效
-    2. 使用 Meta Marketing API SDK 取得數據
-    3. 更新本地資料庫中的 campaigns, ad_sets, ads, creatives
-    4. 更新 creative_metrics 和 audience_metrics 表
-    5. 更新帳戶的 last_sync_at 欄位
-    """
-    logger.info(f"Syncing Meta Ads account: {account_id}")
-
-    try:
-        result = asyncio.run(_sync_meta_account(account_id))
-
-        if result["status"] == "error":
-            logger.error(f"Sync failed for {account_id}: {result.get('error')}")
-            return result
-
-        logger.info(f"Meta Ads account {account_id} sync completed")
-        return result
-
-    except Exception as exc:
-        logger.error(f"Failed to sync Meta Ads account {account_id}: {exc}")
-        # 重試任務
-        raise self.retry(exc=exc)
 
 
-def sync_campaigns(account_id: str):
-    """
-    同步帳戶的廣告活動（Celery Task）
-
-    Args:
-        account_id: 帳戶 UUID
-    """
-    logger.info(f"Syncing campaigns for account: {account_id}")
-    return asyncio.run(_sync_campaigns_task(account_id))
-
-
-async def _sync_campaigns_task(account_id: str) -> dict[str, Any]:
-    """執行 campaigns 同步的異步任務"""
-    worker_session_maker = create_worker_session_maker()
-    async with worker_session_maker() as session:
-        result = await session.execute(
-            select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
-        )
-        account = result.scalar_one_or_none()
-
-        if not account:
-            return {"status": "error", "error": "Account not found"}
-
-        return await sync_campaigns_for_account(session, account)
 
 
 def _parse_campaign_data(raw: dict[str, Any]) -> dict[str, Any]:
@@ -324,10 +243,10 @@ def _parse_campaign_data(raw: dict[str, Any]) -> dict[str, Any]:
     budget_daily = None
     budget_lifetime = None
 
-    if "daily_budget" in raw and raw["daily_budget"]:
+    if "daily_budget" in raw and raw["daily_budget"] is not None:
         budget_daily = Decimal(raw["daily_budget"]) / 100
 
-    if "lifetime_budget" in raw and raw["lifetime_budget"]:
+    if "lifetime_budget" in raw and raw["lifetime_budget"] is not None:
         budget_lifetime = Decimal(raw["lifetime_budget"]) / 100
 
     # 解析日期
@@ -492,7 +411,7 @@ def _parse_adset_data(raw: dict[str, Any]) -> dict[str, Any]:
     # ad_sets 表只有 budget_daily 欄位
     budget_daily = None
 
-    if "daily_budget" in raw and raw["daily_budget"]:
+    if "daily_budget" in raw and raw["daily_budget"] is not None:
         budget_daily = Decimal(raw["daily_budget"]) / 100
 
     return {
@@ -793,16 +712,6 @@ async def sync_ads_for_account(
         )
 
 
-def sync_audiences(account_id: str):
-    """
-    同步帳戶的受眾
-
-    Args:
-        account_id: 帳戶 UUID
-    """
-    logger.info(f"Syncing audiences for account: {account_id}")
-    # TODO: 實作 audiences 同步
-    return {"status": "completed", "audiences_synced": 0}
 
 
 async def sync_account_info(
@@ -1216,28 +1125,3 @@ async def sync_metrics_for_account(
         )
 
 
-def sync_metrics(account_id: str, date_range: str = "last_7d"):
-    """
-    同步帳戶的指標數據（Celery Task）
-
-    Args:
-        account_id: 帳戶 UUID
-        date_range: 日期範圍，預設最近 7 天
-    """
-    logger.info(f"Syncing metrics for account: {account_id}, range: {date_range}")
-    return asyncio.run(_sync_metrics_task(account_id, date_range))
-
-
-async def _sync_metrics_task(account_id: str, date_range: str) -> dict[str, Any]:
-    """執行 metrics 同步的異步任務"""
-    worker_session_maker = create_worker_session_maker()
-    async with worker_session_maker() as session:
-        result = await session.execute(
-            select(AdAccount).where(AdAccount.id == uuid.UUID(account_id))
-        )
-        account = result.scalar_one_or_none()
-
-        if not account:
-            return {"status": "error", "error": "Account not found"}
-
-        return await sync_metrics_for_account(session, account, date_range)

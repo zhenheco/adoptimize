@@ -8,7 +8,7 @@ Meta Marketing API OAuth 路由
 3. 刷新 Token
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlencode
 from uuid import UUID
@@ -28,11 +28,6 @@ from app.services.token_manager import TokenManager
 
 logger = get_logger(__name__)
 
-# 條件導入 Celery 任務（Celery 已棄用，改用 APScheduler）
-try:
-    from app.workers.run_health_audit import run_health_audit
-except ImportError:
-    run_health_audit = None
 
 router = APIRouter()
 
@@ -314,15 +309,6 @@ async def oauth_callback(
                 saved_account_ids.append(str(account_id))
             else:
                 updated_account_ids.append(str(account_id))
-
-            # 觸發健檢任務（背景執行）
-            if run_health_audit is not None:
-                try:
-                    audit_task = run_health_audit.delay(str(account_id))
-                    audit_task_ids.append(audit_task.id)
-                except Exception as e:
-                    # Celery 可能未啟動，記錄但不中斷流程
-                    logger.warning(f"Failed to trigger health audit for account {account_id}: {e}")
 
         # 判斷回應
         all_account_ids = saved_account_ids + updated_account_ids

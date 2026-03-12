@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Sparkles, Zap, Building2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface PlanConfig {
   monthly_fee: number;
@@ -28,7 +29,6 @@ interface PricingTableProps {
  */
 const PLAN_META: Record<string, {
   name: string;
-  description: string;
   icon: React.ReactNode;
   color: string;
   bgGradient: string;
@@ -36,14 +36,12 @@ const PLAN_META: Record<string, {
 }> = {
   free: {
     name: 'Free',
-    description: '免費入門，體驗基礎功能',
     icon: <Sparkles className="w-6 h-6" />,
     color: 'text-gray-600',
     bgGradient: 'from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800',
   },
   pro: {
     name: 'Pro',
-    description: '專業版，適合進階行銷需求',
     icon: <Zap className="w-6 h-6" />,
     color: 'text-blue-600',
     bgGradient: 'from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900',
@@ -51,7 +49,6 @@ const PLAN_META: Record<string, {
   },
   agency: {
     name: 'Agency',
-    description: '代理商專用，最低抽成費率',
     icon: <Building2 className="w-6 h-6" />,
     color: 'text-purple-600',
     bgGradient: 'from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900',
@@ -62,7 +59,17 @@ const PLAN_META: Record<string, {
  * 定價表元件
  */
 export function PricingTable({ plans, currentPlan, onSelectPlan, isLoading }: PricingTableProps) {
+  const t = useTranslations('pricing');
   const planOrder = ['free', 'pro', 'agency'];
+
+  const getPlanDescription = (planKey: string): string => {
+    const descMap: Record<string, string> = {
+      free: t('planFreeDesc'),
+      pro: t('planProDesc'),
+      agency: t('planAgencyDesc'),
+    };
+    return descMap[planKey] || '';
+  };
 
   function renderPlanButton(
     isCurrent: boolean,
@@ -73,7 +80,7 @@ export function PricingTable({ plans, currentPlan, onSelectPlan, isLoading }: Pr
     if (isCurrent) {
       return (
         <Button variant="outline" className="w-full" disabled>
-          目前方案
+          {t('currentPlanLabel')}
         </Button>
       );
     }
@@ -157,7 +164,7 @@ export function PricingTable({ plans, currentPlan, onSelectPlan, isLoading }: Pr
                 <div>
                   <CardTitle className="text-xl">{meta.name}</CardTitle>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {meta.description}
+                    {getPlanDescription(planKey)}
                   </p>
                 </div>
               </div>

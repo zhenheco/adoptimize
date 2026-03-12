@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface Subscription {
   id: string;
@@ -31,25 +32,25 @@ const PLAN_CONFIG: Record<string, {
   label: string;
   color: string;
   bgColor: string;
-  description: string;
+  descKey: string;
 }> = {
   free: {
     label: 'Free',
     color: 'text-gray-600 dark:text-gray-400',
     bgColor: 'bg-gray-100 dark:bg-gray-800',
-    description: '基礎功能，適合個人使用',
+    descKey: 'planFreeDesc' as const,
   },
   pro: {
     label: 'Pro',
     color: 'text-blue-600 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-    description: '進階功能，適合專業行銷人員',
+    descKey: 'planProDesc' as const,
   },
   agency: {
     label: 'Agency',
     color: 'text-purple-600 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-    description: '完整功能，適合代理商',
+    descKey: 'planAgencyDesc' as const,
   },
 };
 
@@ -57,6 +58,7 @@ const PLAN_CONFIG: Record<string, {
  * 訂閱卡片元件
  */
 export function SubscriptionCard({ subscription, showUpgradeButton = true }: SubscriptionCardProps) {
+  const t = useTranslations('billing');
   const config = PLAN_CONFIG[subscription.plan] || PLAN_CONFIG.free;
 
   const formatAmount = (amount: number) => {
@@ -90,7 +92,7 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
-          目前方案
+          {t('currentPlan')}
         </CardTitle>
         <Crown className={`w-4 h-4 ${config.color}`} />
       </CardHeader>
@@ -105,7 +107,7 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
               {subscription.is_active && (
                 <Badge variant="outline" className="text-green-600 border-green-600">
                   <Check className="w-3 h-3 mr-1" />
-                  啟用中
+                  {t('active')}
                 </Badge>
               )}
             </div>
@@ -118,12 +120,12 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
 
           {/* 方案描述 */}
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {config.description}
+            {t(config.descKey)}
           </p>
 
           {/* 抽成費率 */}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">操作抽成費率</span>
+            <span className="text-gray-500 dark:text-gray-400">{t('commissionRate')}</span>
             <span className="font-medium text-gray-900 dark:text-white">
               {subscription.commission_percent}%
             </span>
@@ -132,16 +134,16 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
           {/* 配額使用情況 */}
           <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
             <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-              本月配額使用
+              {t('monthlyQuotaUsage')}
             </h4>
 
             {/* 文案配額 */}
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-500 dark:text-gray-400">AI 文案生成</span>
+                <span className="text-gray-500 dark:text-gray-400">{t('aiCopywriting')}</span>
                 <span className="text-gray-900 dark:text-white">
                   {isUnlimitedCopywriting
-                    ? `${subscription.monthly_copywriting_used} / 無限`
+                    ? `${subscription.monthly_copywriting_used} / ${t('unlimited')}`
                     : `${subscription.monthly_copywriting_used} / ${subscription.monthly_copywriting_quota}`
                   }
                 </span>
@@ -159,10 +161,10 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
             {/* 圖片配額 */}
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-500 dark:text-gray-400">AI 圖片生成</span>
+                <span className="text-gray-500 dark:text-gray-400">{t('aiImageGen')}</span>
                 <span className="text-gray-900 dark:text-white">
                   {isUnlimitedImage
-                    ? `${subscription.monthly_image_used} / 無限`
+                    ? `${subscription.monthly_image_used} / ${t('unlimited')}`
                     : `${subscription.monthly_image_used} / ${subscription.monthly_image_quota}`
                   }
                 </span>
@@ -182,7 +184,7 @@ export function SubscriptionCard({ subscription, showUpgradeButton = true }: Sub
           {showUpgradeButton && subscription.plan !== 'agency' && (
             <Link href="/pricing">
               <Button variant="outline" className="w-full mt-2">
-                升級方案
+                {t('upgradePlan')}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
