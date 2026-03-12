@@ -47,7 +47,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  // 對所有 HTML 頁面設定 no-store，防止 Cloudflare CDN 快取 SSR 回應
+  // （Vercel 已有自己的 CDN，不需要 Cloudflare 再快取一層）
+  const response = NextResponse.next();
+  response.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+  response.headers.set('CDN-Cache-Control', 'no-store');
+  return response;
 }
 
 export const config = {
